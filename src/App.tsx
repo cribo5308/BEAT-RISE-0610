@@ -1,3 +1,4 @@
+import { socket } from "./socket";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import "./App.css";
@@ -6,6 +7,7 @@ type Screen =
   | "home"
   | "tutorial"
   | "battleMenu"
+  | "quickMatching"
   | "quickLobby"
   | "roomCodeInput"
   | "roomLobby"
@@ -236,6 +238,10 @@ function generateNotes(seed: number) {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [battleMode, setBattleMode] = useState<BattleMode>("quick");
+  
+    const [onlineRoomCode, setOnlineRoomCode] = useState("");
+  const [myOnlineSide, setMyOnlineSide] = useState<"A" | "B" | null>(null);
+  const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
 
   const [profile, setProfile] = useState<Profile>({
     nickname: "Danzy",
