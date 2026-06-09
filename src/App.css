@@ -1690,3 +1690,48 @@ p {
     99.2% 100%
   );
 }
+.quickMatchingScreen h1 {
+  margin-top: 54px;
+}
+
+.matchingCard {
+  margin-top: 42px;
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 28px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.075);
+  border: 1px solid rgba(143, 247, 255, 0.16);
+}
+
+.matchingCard strong {
+  display: block;
+  margin-top: 20px;
+  font-size: 22px;
+}
+
+.matchingCard span {
+  display: block;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.matchingSpinner {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 6px solid rgba(255, 255, 255, 0.12);
+  border-top-color: #8ff7ff;
+  border-right-color: #ff4bd8;
+  animation: matchingSpin 0.85s linear infinite;
+}
+
+@keyframes matchingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
