@@ -4,8 +4,22 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 
 type Side = "A" | "B";
+type ProfileBorder = "neon" | "gold" | "purple" | "plain";
 
 type RoomPhase = "waiting" | "lobby" | "battle" | "result";
+
+type PlayerProfilePayload = {
+  nickname?: string;
+  avatar?: string;
+  border?: ProfileBorder;
+  level?: number;
+};
+
+type JoinPayload = PlayerProfilePayload & {
+  roomCode?: string;
+};
+
+type QuickMatchPayload = PlayerProfilePayload;
 
 type RoomPlayer = {
   socketId: string;
@@ -14,6 +28,8 @@ type RoomPlayer = {
   characters: string[];
   nickname: string;
   avatar: string;
+  border: ProfileBorder;
+  level: number;
 };
 
 type RoomState = {
@@ -28,17 +44,6 @@ type RoomState = {
   };
   startedAt: number | null;
   noteSeed: number;
-};
-
-type JoinPayload = {
-  roomCode?: string;
-  nickname?: string;
-  avatar?: string;
-};
-
-type QuickMatchPayload = {
-  nickname?: string;
-  avatar?: string;
 };
 
 const PORT = Number(process.env.PORT || 3001);
@@ -67,7 +72,11 @@ const io = new Server(httpServer, {
 });
 
 const rooms = new Map<string, RoomState>();
-const quickQueue: string[] = [];
+
+const quickQueue: {
+  socketId: string;
+  profile: PlayerProfilePayload;
+}[] = [];
 
 function normalizeRoomCode(roomCode: string) {
   return (roomCode || "BEAT").trim().toUpperCase().slice(0, 8);
@@ -75,6 +84,38 @@ function normalizeRoomCode(roomCode: string) {
 
 function createRandomRoomCode() {
   return `Q${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+}
+
+function normalizeBorder(border?: string): ProfileBorder {
+  if (border === "gold" || border === "purple" || border === "plain") {
+    return border;
+  }
+
+  return "neon";
+}
+
+function normalizeNickname(nickname?: string) {
+  const trimmed = (nickname || "").trim();
+
+  if (!trimmed) return "Guest";
+
+  return trimmed.slice(0, 20);
+}
+
+function normalizeAvatar(avatar?: string, fallback = "G") {
+  const trimmed = (avatar || "").trim();
+
+  if (!trimmed) return fallback;
+
+  return trimmed.slice(0, 3);
+}
+
+function normalizeLevel(level?: number) {
+  const nextLevel = Number(level);
+
+  if (!Number.isFinite(nextLevel) || nextLevel < 1) return 1;
+
+  return Math.floor(nextLevel);
 }
 
 function createRoom(roomCode: string): RoomState {
@@ -114,25 +155,11 @@ function emitRoomState(roomCode: string) {
 }
 
 function removeFromQuickQueue(socketId: string) {
-  const index = quickQueue.indexOf(socketId);
+  const index = quickQueue.findIndex((item) => item.socketId === socketId);
+
   if (index >= 0) {
     quickQueue.splice(index, 1);
   }
-}
-
-function findPlayerRoom(socketId: string) {
-  for (const room of rooms.values()) {
-    const player = room.players.find((item) => item.socketId === socketId);
-
-    if (player) {
-      return {
-        room,
-        player,
-      };
-    }
-  }
-
-  return null;
 }
 
 function removePlayer(socketId: string) {
@@ -169,7 +196,11 @@ function removePlayer(socketId: string) {
   }
 }
 
-function addPlayerToRoom(room: RoomState, socketId: string, payload?: JoinPayload) {
+function addPlayerToRoom(
+  room: RoomState,
+  socketId: string,
+  payload?: PlayerProfilePayload
+) {
   const alreadyInRoom = room.players.find((player) => player.socketId === socketId);
 
   if (alreadyInRoom) {
@@ -187,8 +218,10 @@ function addPlayerToRoom(room: RoomState, socketId: string, payload?: JoinPayloa
     side,
     ready: false,
     characters: [],
-    nickname: payload?.nickname || (side === "A" ? "Player A" : "Player B"),
-    avatar: payload?.avatar || side,
+    nickname: normalizeNickname(payload?.nickname),
+    avatar: normalizeAvatar(payload?.avatar, side),
+    border: normalizeBorder(payload?.border),
+    level: normalizeLevel(payload?.level),
   };
 
   room.players.push(player);
@@ -219,7 +252,12 @@ io.on("connection", (socket) => {
       rooms.set(roomCode, room);
     }
 
-    const player = addPlayerToRoom(room, socket.id, payload);
+    const player = addPlayerToRoom(room, socket.id, {
+      nickname: payload.nickname,
+      avatar: payload.avatar,
+      border: payload.border,
+      level: payload.level,
+    });
 
     if (!player) {
       socket.emit("roomFull", {
@@ -240,12 +278,22 @@ io.on("connection", (socket) => {
   });
 
   socket.on("quickMatch", (payload: QuickMatchPayload) => {
+    console.log("quickMatch requested:", socket.id, payload);
+
     removeFromQuickQueue(socket.id);
 
-    const opponentSocketId = quickQueue.shift();
+    const opponentQueueItem = quickQueue.shift();
 
-    if (!opponentSocketId) {
-      quickQueue.push(socket.id);
+    if (!opponentQueueItem) {
+      quickQueue.push({
+        socketId: socket.id,
+        profile: {
+          nickname: normalizeNickname(payload.nickname),
+          avatar: normalizeAvatar(payload.avatar, "G"),
+          border: normalizeBorder(payload.border),
+          level: normalizeLevel(payload.level),
+        },
+      });
 
       socket.emit("quickMatchWaiting", {
         socketId: socket.id,
@@ -254,10 +302,19 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const opponentSocketId = opponentQueueItem.socketId;
     const opponentSocket = io.sockets.sockets.get(opponentSocketId);
 
     if (!opponentSocket || opponentSocket.disconnected) {
-      quickQueue.push(socket.id);
+      quickQueue.push({
+        socketId: socket.id,
+        profile: {
+          nickname: normalizeNickname(payload.nickname),
+          avatar: normalizeAvatar(payload.avatar, "G"),
+          border: normalizeBorder(payload.border),
+          level: normalizeLevel(payload.level),
+        },
+      });
 
       socket.emit("quickMatchWaiting", {
         socketId: socket.id,
@@ -272,13 +329,17 @@ io.on("connection", (socket) => {
     rooms.set(roomCode, room);
 
     const playerA = addPlayerToRoom(room, opponentSocketId, {
-      nickname: "Quick Player A",
-      avatar: "A",
+      nickname: opponentQueueItem.profile.nickname,
+      avatar: opponentQueueItem.profile.avatar,
+      border: opponentQueueItem.profile.border,
+      level: opponentQueueItem.profile.level,
     });
 
     const playerB = addPlayerToRoom(room, socket.id, {
-      nickname: payload.nickname || "Quick Player B",
-      avatar: payload.avatar || "B",
+      nickname: payload.nickname,
+      avatar: payload.avatar,
+      border: payload.border,
+      level: payload.level,
     });
 
     if (!playerA || !playerB) {
@@ -434,7 +495,6 @@ io.on("connection", (socket) => {
     (payload: {
       roomCode: string;
       noteId: string | number;
-      side: Side;
       rating: string;
       scoreDelta: number;
       combo: number;
@@ -446,7 +506,7 @@ io.on("connection", (socket) => {
       const player = room.players.find((item) => item.socketId === socket.id);
       if (!player) return;
 
-      const side: Side = player.side;
+      const side = player.side;
       const scoreDelta = Math.max(0, Math.floor(Number(payload.scoreDelta) || 0));
 
       room.scores[side] += scoreDelta;
@@ -457,6 +517,29 @@ io.on("connection", (socket) => {
         rating: payload.rating,
         scoreDelta,
         combo: Number(payload.combo) || 0,
+        scores: room.scores,
+      });
+
+      emitRoomState(roomCode);
+    }
+  );
+
+  socket.on(
+    "scoreSync",
+    (payload: { roomCode: string; score: number }) => {
+      const roomCode = normalizeRoomCode(payload.roomCode);
+      const room = rooms.get(roomCode);
+      if (!room) return;
+
+      const player = room.players.find((item) => item.socketId === socket.id);
+      if (!player) return;
+
+      const side = player.side;
+      room.scores[side] = Math.max(0, Math.floor(Number(payload.score) || 0));
+
+      io.to(roomCode).emit("scoreSync", {
+        side,
+        score: room.scores[side],
         scores: room.scores,
       });
 
@@ -515,26 +598,6 @@ io.on("connection", (socket) => {
       });
     }
   );
-
-  socket.on("scoreSync", (payload: { roomCode: string; score: number }) => {
-    const roomCode = normalizeRoomCode(payload.roomCode);
-    const room = rooms.get(roomCode);
-    if (!room) return;
-
-    const player = room.players.find((item) => item.socketId === socket.id);
-    if (!player) return;
-
-    const side = player.side;
-    room.scores[side] = Math.max(0, Math.floor(Number(payload.score) || 0));
-
-    io.to(roomCode).emit("scoreSync", {
-      side,
-      score: room.scores[side],
-      scores: room.scores,
-    });
-
-    emitRoomState(roomCode);
-  });
 
   socket.on("battleEnded", (payload: { roomCode: string }) => {
     const roomCode = normalizeRoomCode(payload.roomCode);
