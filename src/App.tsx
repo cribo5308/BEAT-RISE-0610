@@ -2081,6 +2081,7 @@ function LobbyScreen({
   opponentBorder = "purple",
   opponentLevel = 1,
   selectedMusic,
+  setSelectedMusic,
   musicOpen,
   setMusicOpen,
   selectedCharacters,
