@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 
 export type OnlineSide = "A" | "B";
-
+export type OnlineProfileBorder = "neon" | "gold" | "purple" | "plain";
 export type OnlineRoomPhase = "waiting" | "lobby" | "battle" | "result";
 
 export type ServerRoomPlayer = {
@@ -11,6 +11,8 @@ export type ServerRoomPlayer = {
   characters: string[];
   nickname: string;
   avatar: string;
+  border: OnlineProfileBorder;
+  level: number;
 };
 
 export type ServerRoomState = {
@@ -34,7 +36,6 @@ function getSocketServerUrl() {
 
   const { protocol, hostname } = window.location;
 
-  // StackBlitz WebContainer 테스트용
   if (hostname.includes("webcontainer-api.io")) {
     const serverHostname = hostname.replace(/-(\d+)(--|-)/, "-3001$2");
     return `${protocol}//${serverHostname}`;
