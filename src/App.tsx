@@ -396,14 +396,6 @@ export default function App() {
     [selectedCharacters]
   );
 
-  const aiCharacterObjects = useMemo(
-    () =>
-      aiCharacters
-        .map((id) => characters.find((c) => c.id === id))
-        .filter(Boolean) as Character[],
-    [aiCharacters]
-  );
-
   const expPercent = (profile.exp % 400) / 4;
   const winRate = getWinRate(profile.wins, profile.losses);
   const multiplier = getComboMultiplier(combo);
