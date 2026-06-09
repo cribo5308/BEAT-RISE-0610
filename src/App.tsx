@@ -249,6 +249,13 @@ export default function App() {
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
   const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
 
+  const [onlineOpponentProfile, setOnlineOpponentProfile] = useState({
+  nickname: "Rival",
+  avatar: "R",
+  border: "purple" as Profile["border"],
+  level: 1,
+});
+  
 const [profile, setProfile] = useState<Profile>({
   nickname: "Guest",
   avatar: "G",
@@ -491,14 +498,22 @@ useEffect(() => {
     function handleQuickMatchFound(payload: {
       roomCode: string;
       side: OnlineSide;
-      state: {
-        musicId?: string;
-        noteSeed?: number;
-      };
+     state: {
+  musicId?: string;
+  noteSeed?: number;
+  players?: {
+    side: OnlineSide;
+    nickname: string;
+    avatar: string;
+    border?: Profile["border"];
+    level?: number;
+  }[];
+};
     }) {
       setOnlineRoomCode(payload.roomCode);
       setRoomCode(payload.roomCode);
       setMyOnlineSide(payload.side);
+      updateOnlineOpponentProfile(payload.state?.players, payload.side);
 
       const matchedMusic = musicTracks.find(
         (track) => track.id === payload.state?.musicId
@@ -514,10 +529,17 @@ useEffect(() => {
     function handleJoinedRoom(payload: {
       roomCode: string;
       side: OnlineSide;
-      state: {
-        musicId?: string;
-        noteSeed?: number;
-      };
+     state: {
+  musicId?: string;
+  noteSeed?: number;
+  players?: {
+    side: OnlineSide;
+    nickname: string;
+    avatar: string;
+    border?: Profile["border"];
+    level?: number;
+  }[];
+};
     }) {
       setOnlineRoomCode(payload.roomCode);
       setMyOnlineSide(payload.side);
@@ -555,18 +577,27 @@ useEffect(() => {
       startBattle(mode, payload.noteSeed);
     }
 
-    function handleRoomState(payload: {
-      roomCode: string;
-      scores?: {
-        A: number;
-        B: number;
-      };
-    }) {
-      if (!payload.scores || !myOnlineSide) return;
+function handleRoomState(payload: {
+  roomCode: string;
+  players?: {
+    side: OnlineSide;
+    nickname: string;
+    avatar: string;
+    border?: Profile["border"];
+    level?: number;
+  }[];
+  scores?: {
+    A: number;
+    B: number;
+  };
+}) {
+  updateOnlineOpponentProfile(payload.players, myOnlineSide);
 
-      const rivalSide = myOnlineSide === "A" ? "B" : "A";
-      setRivalScore(payload.scores[rivalSide]);
-    }
+  if (!payload.scores || !myOnlineSide) return;
+
+  const rivalSide = myOnlineSide === "A" ? "B" : "A";
+  setRivalScore(payload.scores[rivalSide]);
+}
 
     function handleScoreSync(payload: {
       side: OnlineSide;
@@ -653,6 +684,31 @@ setProfile((prev) => ({
   followers: 0,
   following: 0,
 }));
+}
+  function updateOnlineOpponentProfile(
+  players:
+    | {
+        side: OnlineSide;
+        nickname: string;
+        avatar: string;
+        border?: Profile["border"];
+        level?: number;
+      }[]
+    | undefined,
+  mySide: OnlineSide | null
+) {
+  if (!players || !mySide) return;
+
+  const rival = players.find((player) => player.side !== mySide);
+
+  if (!rival) return;
+
+  setOnlineOpponentProfile({
+    nickname: rival.nickname || "Rival",
+    avatar: rival.avatar || "R",
+    border: rival.border || "purple",
+    level: Number(rival.level) || 1,
+  });
 }
   function completeMission(id: string) {
     setMissions((prev) =>
@@ -1198,10 +1254,12 @@ setProfile((prev) => ({
                 setMatchingText("상대를 찾는 중...");
                 setScreen("quickMatching");
 
-                socket.emit("quickMatch", {
-                  nickname: profile.nickname,
-                  avatar: profile.avatar,
-                });
+             socket.emit("quickMatch", {
+  nickname: profile.nickname,
+  avatar: profile.avatar,
+  border: profile.border,
+  level: profile.level,
+});
               }}
             >
               <strong>빠른 대전</strong>
@@ -1288,10 +1346,12 @@ setProfile((prev) => ({
               onClick={() => {
                 setBattleMode("room");
                 socket.emit("createOrJoinRoom", {
-                  roomCode,
-                  nickname: profile.nickname,
-                  avatar: profile.avatar,
-                });
+  roomCode,
+  nickname: profile.nickname,
+  avatar: profile.avatar,
+  border: profile.border,
+  level: profile.level,
+});
               }}
             >
               입장하기
@@ -1304,8 +1364,10 @@ setProfile((prev) => ({
             title="빠른 대전"
             subtitle="상대가 매칭됐어. 캐릭터를 선택하고 준비해."
             profile={profile}
-            opponentName="Matched Riser"
-            opponentAvatar="R"
+           opponentName={onlineOpponentProfile.nickname}
+opponentAvatar={onlineOpponentProfile.avatar}
+opponentBorder={onlineOpponentProfile.border}
+opponentLevel={onlineOpponentProfile.level}
             selectedMusic={selectedMusic}
             setSelectedMusic={setSelectedMusic}
             musicOpen={musicOpen}
@@ -1338,8 +1400,10 @@ setProfile((prev) => ({
             title="배틀 룸"
             subtitle="방장이 음악을 고르고 양쪽이 준비하면 시작돼."
             profile={profile}
-            opponentName="Guest Player"
-            opponentAvatar="G"
+            opponentName={onlineOpponentProfile.nickname}
+opponentAvatar={onlineOpponentProfile.avatar}
+opponentBorder={onlineOpponentProfile.border}
+opponentLevel={onlineOpponentProfile.level}
             roomCode={roomCode}
             setRoomCode={setRoomCode}
             selectedMusic={selectedMusic}
@@ -2014,8 +2078,9 @@ function LobbyScreen({
   profile,
   opponentName,
   opponentAvatar,
+  opponentBorder = "purple",
+  opponentLevel = 1,
   selectedMusic,
-  setSelectedMusic,
   musicOpen,
   setMusicOpen,
   selectedCharacters,
@@ -2031,6 +2096,8 @@ function LobbyScreen({
   profile: Profile;
   opponentName: string;
   opponentAvatar: string;
+  opponentBorder?: Profile["border"];
+opponentLevel?: number;
   selectedMusic: MusicTrack;
   setSelectedMusic: (track: MusicTrack) => void;
   musicOpen: boolean;
@@ -2055,13 +2122,13 @@ function LobbyScreen({
       <div className="profileVersus compact">
         <ProfileCard profile={profile} />
         <div className="vsMark">VS</div>
-        <div className="lobbyProfileCard">
-          <div className="avatarFrame purple">
-            <div className="avatar">{opponentAvatar}</div>
-          </div>
-          <strong>{opponentName}</strong>
-          <span>대기 중</span>
-        </div>
+       <div className="lobbyProfileCard">
+  <div className={`avatarFrame ${opponentBorder}`}>
+    <div className="avatar">{opponentAvatar}</div>
+  </div>
+  <strong>{opponentName}</strong>
+  <span>Lv.{opponentLevel}</span>
+</div>
       </div>
 
       {roomCode !== undefined && setRoomCode && (
