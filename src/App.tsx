@@ -249,17 +249,17 @@ export default function App() {
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
   const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
 
-  const [profile, setProfile] = useState<Profile>({
-    nickname: "Danzy",
-    avatar: "D",
-    border: "neon",
-    level: 1,
-    exp: 0,
-    followers: 940,
-    following: 128,
-    wins: 0,
-    losses: 0,
-  });
+const [profile, setProfile] = useState<Profile>({
+  nickname: "Guest",
+  avatar: "G",
+  border: "neon",
+  level: 1,
+  exp: 0,
+  followers: 0,
+  following: 0,
+  wins: 0,
+  losses: 0,
+});
 
   const [gems, setGems] = useState(120);
   const [coins, setCoins] = useState(3200);
@@ -331,31 +331,10 @@ export default function App() {
 
   const [result, setResult] = useState<ResultData | null>(null);
 
-  const [friends, setFriends] = useState<Friend[]>([
-    { id: "r1", nickname: "MikaFan", avatar: "M", mutual: true, giftedToday: false },
-    { id: "r2", nickname: "JetKing", avatar: "J", mutual: true, giftedToday: false },
-    { id: "r3", nickname: "LunaMoon", avatar: "L", mutual: false, giftedToday: false },
-  ]);
+const [friends, setFriends] = useState<Friend[]>([]);
   const [friendSearch, setFriendSearch] = useState("");
 
-  const [mails, setMails] = useState<Mail[]>([
-    {
-      id: "m1",
-      type: "follow",
-      from: "LunaMoon",
-      avatar: "L",
-      text: "LunaMoon님이 나를 팔로우했습니다.",
-      claimed: false,
-    },
-    {
-      id: "m2",
-      type: "gift",
-      from: "MikaFan",
-      avatar: "M",
-      text: "MikaFan님이 젬 5개를 선물했습니다.",
-      claimed: false,
-    },
-  ]);
+const [mails, setMails] = useState<Mail[]>([]);
 
   const [missions, setMissions] = useState<Mission[]>([
     {
@@ -667,11 +646,13 @@ async function signOut() {
   }
 
   setSession(null);
-  setProfile((prev) => ({
-    ...prev,
-    nickname: "Danzy",
-    avatar: "D",
-  }));
+setProfile((prev) => ({
+  ...prev,
+  nickname: "Guest",
+  avatar: "G",
+  followers: 0,
+  following: 0,
+}));
 }
   function completeMission(id: string) {
     setMissions((prev) =>
@@ -1073,11 +1054,16 @@ async function signOut() {
     };
   }
 
-  function followFriend(friendId: string) {
-    setFriends((prev) =>
-      prev.map((f) => (f.id === friendId ? { ...f, mutual: true } : f))
-    );
-  }
+ function followFriend(friendId: string) {
+  setFriends((prev) =>
+    prev.map((f) => (f.id === friendId ? { ...f, mutual: true } : f))
+  );
+
+  setProfile((prev) => ({
+    ...prev,
+    following: prev.following + 1,
+  }));
+}
 
   function sendGift(friendId: string) {
     setFriends((prev) =>
@@ -1797,18 +1783,23 @@ async function signOut() {
                 onClick={() => {
                   if (!friendSearch.trim()) return;
 
-                  setFriends((prev) => [
-                    ...prev,
-                    {
-                      id: Date.now().toString(),
-                      nickname: friendSearch.trim(),
-                      avatar: friendSearch.trim()[0].toUpperCase(),
-                      mutual: false,
-                      giftedToday: false,
-                    },
-                  ]);
+                 setFriends((prev) => [
+  ...prev,
+  {
+    id: Date.now().toString(),
+    nickname: friendSearch.trim(),
+    avatar: friendSearch.trim()[0].toUpperCase(),
+    mutual: false,
+    giftedToday: false,
+  },
+]);
 
-                  setFriendSearch("");
+setProfile((prev) => ({
+  ...prev,
+  following: prev.following + 1,
+}));
+
+setFriendSearch("");
                 }}
               >
                 팔로우
