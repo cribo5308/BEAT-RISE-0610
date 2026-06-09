@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import "./App.css";
 import { socket } from "./socket";
+import { supabase } from "./supabaseClient";
+import type { Session } from "@supabase/supabase-js";
 
 type Screen =
   | "home"
