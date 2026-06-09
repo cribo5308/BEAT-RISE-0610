@@ -249,6 +249,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [nicknameDraft, setNicknameDraft] = useState("Guest");
   const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [onlineRoomCode, setOnlineRoomCode] = useState("");
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
