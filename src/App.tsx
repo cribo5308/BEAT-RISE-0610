@@ -415,6 +415,70 @@ export default function App() {
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
 
+useEffect(() => {
+  let mounted = true;
+
+  async function loadSession() {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    if (error) {
+      console.log("Supabase session error:", error.message);
+      setAuthLoading(false);
+      return;
+    }
+
+    setSession(data.session);
+    setAuthLoading(false);
+
+    const user = data.session?.user;
+
+    if (user) {
+      const displayName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email ||
+        "Riser";
+
+      setProfile((prev) => ({
+        ...prev,
+        nickname: displayName,
+        avatar: displayName.slice(0, 1).toUpperCase(),
+      }));
+    }
+  }
+
+  loadSession();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    setSession(nextSession);
+    setAuthLoading(false);
+
+    const user = nextSession?.user;
+
+    if (user) {
+      const displayName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email ||
+        "Riser";
+
+      setProfile((prev) => ({
+        ...prev,
+        nickname: displayName,
+        avatar: displayName.slice(0, 1).toUpperCase(),
+      }));
+    }
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
   useEffect(() => {
     function handleConnect() {
       console.log("✅ socket connected:", socket.id);
@@ -576,6 +640,34 @@ export default function App() {
     };
   }, [myOnlineSide, screen]);
 
+  async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    alert(`로그인 실패: ${error.message}`);
+  }
+}
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert(`로그아웃 실패: ${error.message}`);
+    return;
+  }
+
+  setSession(null);
+  setProfile((prev) => ({
+    ...prev,
+    nickname: "Danzy",
+    avatar: "D",
+  }));
+}
   function completeMission(id: string) {
     setMissions((prev) =>
       prev.map((m) => (m.id === id ? { ...m, done: true } : m))
@@ -1555,7 +1647,19 @@ export default function App() {
               </div>
             </div>
 
-            <button className="profileLoginButton">Google 계정 연동</button>
+            {authLoading ? (
+  <button className="profileLoginButton" disabled>
+    로그인 확인 중...
+  </button>
+) : session ? (
+  <button className="profileLoginButton" onClick={signOut}>
+    로그아웃
+  </button>
+) : (
+  <button className="profileLoginButton" onClick={signInWithGoogle}>
+    Google 계정으로 로그인
+  </button>
+)}
 
             <div className="recordPreview">
               <h3>최근 전적</h3>
@@ -1640,7 +1744,15 @@ export default function App() {
               튜토리얼 다시 보기
             </button>
             <button className="menuListButton">고객 지원</button>
-            <button className="menuListButton danger">로그아웃</button>
+            {session ? (
+  <button className="menuListButton danger" onClick={signOut}>
+    로그아웃
+  </button>
+) : (
+  <button className="menuListButton" onClick={signInWithGoogle}>
+    Google 로그인
+  </button>
+)}
           </Modal>
         )}
 
