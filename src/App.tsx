@@ -408,7 +408,80 @@ export default function App() {
   const missionNotice = missions.some((m) => m.done && !m.claimed);
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
+useEffect(() => {
+  function handleQuickMatchWaiting() {
+    setMatchingText("상대를 찾는 중...");
+    setScreen("quickMatching");
+  }
 
+  function handleQuickMatchFound(payload: {
+    roomCode: string;
+    side: "A" | "B";
+    state: {
+      musicId?: string;
+      noteSeed?: number;
+    };
+  }) {
+    setOnlineRoomCode(payload.roomCode);
+    setMyOnlineSide(payload.side);
+
+    const matchedMusic = musicTracks.find(
+      (track) => track.id === payload.state?.musicId
+    );
+
+    if (matchedMusic) {
+      setSelectedMusic(matchedMusic);
+    }
+
+    setScreen("quickLobby");
+  }
+
+  function handleBattleStarted(payload: {
+    roomCode: string;
+    startedAt: number;
+    musicId: string;
+    noteSeed: number;
+    scores: {
+      A: number;
+      B: number;
+    };
+  }) {
+    const matchedMusic = musicTracks.find(
+      (track) => track.id === payload.musicId
+    );
+
+    if (matchedMusic) {
+      setSelectedMusic(matchedMusic);
+    }
+
+    startBattle("quick");
+  }
+
+  function handleRoomState(payload: {
+    roomCode: string;
+    scores?: {
+      A: number;
+      B: number;
+    };
+  }) {
+    if (!payload.scores || !myOnlineSide) return;
+
+    const rivalSide = myOnlineSide === "A" ? "B" : "A";
+    setRivalScore(payload.scores[rivalSide]);
+  }
+
+  socket.on("quickMatchWaiting", handleQuickMatchWaiting);
+  socket.on("quickMatchFound", handleQuickMatchFound);
+  socket.on("battleStarted", handleBattleStarted);
+  socket.on("roomState", handleRoomState);
+
+  return () => {
+    socket.off("quickMatchWaiting", handleQuickMatchWaiting);
+    socket.off("quickMatchFound", handleQuickMatchFound);
+    socket.off("battleStarted", handleBattleStarted);
+    socket.off("roomState", handleRoomState);
+  };
+}, [myOnlineSide]);
   function completeMission(id: string) {
     setMissions((prev) =>
       prev.map((m) => (m.id === id ? { ...m, done: true } : m))
@@ -885,17 +958,22 @@ export default function App() {
             <p className="eyebrow">BATTLE</p>
             <h1>배틀 선택</h1>
 
-            <button
-              className="battleModeCard"
-              onClick={() => {
-                setBattleMode("quick");
-                setSelectedMusic(getRandomMusic());
-                setScreen("quickLobby");
-              }}
-            >
-              <strong>빠른 대전</strong>
-              <span>랜덤 상대를 찾아서 배틀</span>
-            </button>
+           <button
+  className="battleModeCard"
+  onClick={() => {
+    setBattleMode("quick");
+    setMatchingText("상대를 찾는 중...");
+    setScreen("quickMatching");
+
+    socket.emit("quickMatch", {
+      nickname: profile.nickname,
+      avatar: profile.avatar,
+    });
+  }}
+>
+  <strong>빠른 대전</strong>
+  <span>랜덤 상대를 찾아서 배틀</span>
+</button>
 
             <button
   className="battleModeCard"
@@ -956,6 +1034,28 @@ export default function App() {
     </button>
   </div>
 )}
+        {screen === "quickMatching" && (
+  <div className="screen quickMatchingScreen">
+    <button
+      className="backButton"
+      onClick={() => {
+        socket.emit("cancelQuickMatch");
+        setScreen("battleMenu");
+      }}
+    >
+      ←
+    </button>
+
+    <p className="eyebrow">QUICK MATCH</p>
+    <h1>빠른 대전</h1>
+
+    <div className="matchingCard">
+      <div className="matchingSpinner" />
+      <strong>{matchingText}</strong>
+      <span>다른 플레이어가 빠른 대전에 들어오면 자동으로 매칭돼.</span>
+    </div>
+  </div>
+)}
         {screen === "quickLobby" && (
           <LobbyScreen
             title="빠른 대전"
@@ -970,8 +1070,20 @@ export default function App() {
             selectedCharacters={selectedCharacters}
             toggleCharacter={(id) => toggleCharacter(id, "player")}
             onBack={() => setScreen("battleMenu")}
-            onStart={() => startBattle("quick")}
-            startLabel="매칭 시작"
+            onStart={() => {
+  if (!onlineRoomCode) return;
+
+  socket.emit("selectCharacters", {
+    roomCode: onlineRoomCode,
+    characters: selectedCharacters,
+  });
+
+  socket.emit("playerReady", {
+    roomCode: onlineRoomCode,
+    ready: true,
+  });
+}}
+startLabel="준비 완료"
           />
         )}
 
