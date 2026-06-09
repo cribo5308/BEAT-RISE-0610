@@ -242,6 +242,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [battleMode, setBattleMode] = useState<BattleMode>("quick");
 
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [onlineRoomCode, setOnlineRoomCode] = useState("");
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
   const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
