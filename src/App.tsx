@@ -1,7 +1,7 @@
-import { socket } from "./socket";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import "./App.css";
+import { socket } from "./socket";
 
 type Screen =
   | "home"
@@ -19,6 +19,7 @@ type Screen =
 
 type BattleMode = "quick" | "room" | "ai";
 type Judge = "PERFECT" | "GREAT" | "GOOD" | "MISS" | "";
+type OnlineSide = "A" | "B";
 
 type Character = {
   id: string;
@@ -185,7 +186,7 @@ const tutorialPages = [
   },
   {
     title: "피버와 스킬",
-    desc: "노트를 맞히면 양옆 피버 게이지가 차고, 100%가 되면 캐릭터 스킬을 사용할 수 있어.",
+    desc: "노트를 맞히면 피버 게이지가 차고, 100%가 되면 캐릭터 스킬을 사용할 수 있어.",
   },
   {
     title: "공격 성공",
@@ -238,9 +239,9 @@ function generateNotes(seed: number) {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [battleMode, setBattleMode] = useState<BattleMode>("quick");
-  
-    const [onlineRoomCode, setOnlineRoomCode] = useState("");
-  const [myOnlineSide, setMyOnlineSide] = useState<"A" | "B" | null>(null);
+
+  const [onlineRoomCode, setOnlineRoomCode] = useState("");
+  const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
   const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
 
   const [profile, setProfile] = useState<Profile>({
@@ -408,80 +409,168 @@ export default function App() {
   const missionNotice = missions.some((m) => m.done && !m.claimed);
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
-useEffect(() => {
-  function handleQuickMatchWaiting() {
-    setMatchingText("상대를 찾는 중...");
-    setScreen("quickMatching");
-  }
 
-  function handleQuickMatchFound(payload: {
-    roomCode: string;
-    side: "A" | "B";
-    state: {
-      musicId?: string;
-      noteSeed?: number;
-    };
-  }) {
-    setOnlineRoomCode(payload.roomCode);
-    setMyOnlineSide(payload.side);
-
-    const matchedMusic = musicTracks.find(
-      (track) => track.id === payload.state?.musicId
-    );
-
-    if (matchedMusic) {
-      setSelectedMusic(matchedMusic);
+  useEffect(() => {
+    function handleConnect() {
+      console.log("✅ socket connected:", socket.id);
     }
 
-    setScreen("quickLobby");
-  }
-
-  function handleBattleStarted(payload: {
-    roomCode: string;
-    startedAt: number;
-    musicId: string;
-    noteSeed: number;
-    scores: {
-      A: number;
-      B: number;
-    };
-  }) {
-    const matchedMusic = musicTracks.find(
-      (track) => track.id === payload.musicId
-    );
-
-    if (matchedMusic) {
-      setSelectedMusic(matchedMusic);
+    function handleConnectError(error: Error) {
+      console.log("❌ socket connect error:", error.message);
     }
 
-    startBattle("quick");
-  }
+    function handleDisconnect() {
+      console.log("⚠️ socket disconnected");
+    }
 
-  function handleRoomState(payload: {
-    roomCode: string;
-    scores?: {
-      A: number;
-      B: number;
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
+    socket.on("disconnect", handleDisconnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("disconnect", handleDisconnect);
     };
-  }) {
-    if (!payload.scores || !myOnlineSide) return;
+  }, []);
 
-    const rivalSide = myOnlineSide === "A" ? "B" : "A";
-    setRivalScore(payload.scores[rivalSide]);
-  }
+  useEffect(() => {
+    function handleQuickMatchWaiting() {
+      setMatchingText("상대를 찾는 중...");
+      setScreen("quickMatching");
+    }
 
-  socket.on("quickMatchWaiting", handleQuickMatchWaiting);
-  socket.on("quickMatchFound", handleQuickMatchFound);
-  socket.on("battleStarted", handleBattleStarted);
-  socket.on("roomState", handleRoomState);
+    function handleQuickMatchFound(payload: {
+      roomCode: string;
+      side: OnlineSide;
+      state: {
+        musicId?: string;
+        noteSeed?: number;
+      };
+    }) {
+      setOnlineRoomCode(payload.roomCode);
+      setRoomCode(payload.roomCode);
+      setMyOnlineSide(payload.side);
 
-  return () => {
-    socket.off("quickMatchWaiting", handleQuickMatchWaiting);
-    socket.off("quickMatchFound", handleQuickMatchFound);
-    socket.off("battleStarted", handleBattleStarted);
-    socket.off("roomState", handleRoomState);
-  };
-}, [myOnlineSide]);
+      const matchedMusic = musicTracks.find(
+        (track) => track.id === payload.state?.musicId
+      );
+
+      if (matchedMusic) {
+        setSelectedMusic(matchedMusic);
+      }
+
+      setScreen("quickLobby");
+    }
+
+    function handleJoinedRoom(payload: {
+      roomCode: string;
+      side: OnlineSide;
+      state: {
+        musicId?: string;
+        noteSeed?: number;
+      };
+    }) {
+      setOnlineRoomCode(payload.roomCode);
+      setMyOnlineSide(payload.side);
+
+      const matchedMusic = musicTracks.find(
+        (track) => track.id === payload.state?.musicId
+      );
+
+      if (matchedMusic) {
+        setSelectedMusic(matchedMusic);
+      }
+
+      setScreen("roomLobby");
+    }
+
+    function handleBattleStarted(payload: {
+      roomCode: string;
+      startedAt: number;
+      musicId: string;
+      noteSeed: number;
+      scores: {
+        A: number;
+        B: number;
+      };
+    }) {
+      const matchedMusic = musicTracks.find(
+        (track) => track.id === payload.musicId
+      );
+
+      if (matchedMusic) {
+        setSelectedMusic(matchedMusic);
+      }
+
+      const mode = screen === "roomLobby" ? "room" : "quick";
+      startBattle(mode, payload.noteSeed);
+    }
+
+    function handleRoomState(payload: {
+      roomCode: string;
+      scores?: {
+        A: number;
+        B: number;
+      };
+    }) {
+      if (!payload.scores || !myOnlineSide) return;
+
+      const rivalSide = myOnlineSide === "A" ? "B" : "A";
+      setRivalScore(payload.scores[rivalSide]);
+    }
+
+    function handleScoreSync(payload: {
+      side: OnlineSide;
+      score: number;
+      scores: {
+        A: number;
+        B: number;
+      };
+    }) {
+      if (!myOnlineSide) return;
+
+      const rivalSide = myOnlineSide === "A" ? "B" : "A";
+
+      if (payload.side === rivalSide) {
+        setRivalScore(payload.score);
+        return;
+      }
+
+      setRivalScore(payload.scores[rivalSide]);
+    }
+
+    function handleAttackSuccess(payload: {
+      fromSide: OnlineSide;
+      targetSide: OnlineSide;
+    }) {
+      if (!myOnlineSide) return;
+
+      if (payload.fromSide === myOnlineSide) {
+        setAttackSuccess(true);
+        setTimeout(() => setAttackSuccess(false), 900);
+      }
+    }
+
+    socket.on("quickMatchWaiting", handleQuickMatchWaiting);
+    socket.on("quickMatchFound", handleQuickMatchFound);
+    socket.on("joinedRoom", handleJoinedRoom);
+    socket.on("battleStarted", handleBattleStarted);
+    socket.on("roomState", handleRoomState);
+    socket.on("scoreSync", handleScoreSync);
+    socket.on("attackSuccess", handleAttackSuccess);
+
+    return () => {
+      socket.off("quickMatchWaiting", handleQuickMatchWaiting);
+      socket.off("quickMatchFound", handleQuickMatchFound);
+      socket.off("joinedRoom", handleJoinedRoom);
+      socket.off("battleStarted", handleBattleStarted);
+      socket.off("roomState", handleRoomState);
+      socket.off("scoreSync", handleScoreSync);
+      socket.off("attackSuccess", handleAttackSuccess);
+    };
+  }, [myOnlineSide, screen]);
+
   function completeMission(id: string) {
     setMissions((prev) =>
       prev.map((m) => (m.id === id ? { ...m, done: true } : m))
@@ -492,15 +581,23 @@ useEffect(() => {
     setMissions((prev) =>
       prev.map((m) => {
         if (m.id !== id || !m.done || m.claimed) return m;
-        if (m.reward.includes("젬")) setGems((g) => g + 3);
-        else setCoins((c) => c + 100);
+
+        if (m.reward.includes("젬")) {
+          setGems((g) => g + 3);
+        } else {
+          setCoins((c) => c + 100);
+        }
+
         return { ...m, claimed: true };
       })
     );
   }
 
   function getPointerAngle(clientX: number, clientY: number) {
-    const rad = Math.atan2(clientY - dragRef.current.centerY, clientX - dragRef.current.centerX);
+    const rad = Math.atan2(
+      clientY - dragRef.current.centerY,
+      clientX - dragRef.current.centerX
+    );
     return (rad * 180) / Math.PI;
   }
 
@@ -527,19 +624,19 @@ useEffect(() => {
 
   function startInertia(initialVelocity: number) {
     let velocity = initialVelocity * 2.4;
-  
+
     const step = () => {
       velocity *= 0.975;
-  
+
       if (Math.abs(velocity) < 0.008) {
         dragRef.current.inertiaFrame = 0;
         return;
       }
-  
+
       setTurntableAngle((prev) => prev + velocity * 22);
       dragRef.current.inertiaFrame = requestAnimationFrame(step);
     };
-  
+
     dragRef.current.inertiaFrame = requestAnimationFrame(step);
   }
 
@@ -634,8 +731,11 @@ useEffect(() => {
     });
   }
 
-  function startBattle(mode: BattleMode) {
-    const seed = selectedMusic.bpm + selectedCharacters.length * 17 + mode.length;
+  function startBattle(mode: BattleMode, onlineSeed?: number) {
+    const seed =
+      onlineSeed ??
+      selectedMusic.bpm + selectedCharacters.length * 17 + mode.length;
+
     setBattleMode(mode);
     setNotes(generateNotes(seed));
     setBattleStartedAt(performance.now());
@@ -657,18 +757,15 @@ useEffect(() => {
     completeMission("daily1");
   }
 
-  function addScoreByJudge(nextJudge: Judge, nextCombo: number) {
-    const base =
-      nextJudge === "PERFECT"
-        ? 100
-        : nextJudge === "GREAT"
-          ? 82
-          : nextJudge === "GOOD"
-            ? 60
-            : 0;
+  function syncOnlineScore(nextScore: number) {
+    if ((battleMode !== "quick" && battleMode !== "room") || !onlineRoomCode) {
+      return;
+    }
 
-    const skillMultiplier = skillActive === "kai" ? 2 : 1;
-    setMyScore((prev) => Math.floor(prev + base * getComboMultiplier(nextCombo) * skillMultiplier));
+    socket.emit("scoreSync", {
+      roomCode: onlineRoomCode,
+      score: nextScore,
+    });
   }
 
   function handleMiss() {
@@ -703,7 +800,16 @@ useEffect(() => {
 
     const nextCombo = combo + 1;
     const lunaBonus = selectedCharacters.includes("luna") ? 2 : 1;
-    const feverGain = nextJudge === "PERFECT" ? 12 * lunaBonus : nextJudge === "GREAT" ? 9 : 6;
+    const feverGain =
+      nextJudge === "PERFECT" ? 12 * lunaBonus : nextJudge === "GREAT" ? 9 : 6;
+
+    const baseScore =
+      nextJudge === "PERFECT" ? 100 : nextJudge === "GREAT" ? 82 : 60;
+
+    const scoreDelta =
+      baseScore *
+      getComboMultiplier(nextCombo) *
+      (skillActive === "kai" ? 2 : 1);
 
     setNotes((prev) =>
       prev.map((n) => (n.id === target.id ? { ...n, hit: true } : n))
@@ -713,7 +819,12 @@ useEffect(() => {
     setCombo(nextCombo);
     setMaxCombo((prev) => Math.max(prev, nextCombo));
     setFever((prev) => clamp(prev + feverGain, 0, 100));
-    addScoreByJudge(nextJudge, nextCombo);
+
+    setMyScore((prev) => {
+      const nextScore = Math.floor(prev + scoreDelta);
+      syncOnlineScore(nextScore);
+      return nextScore;
+    });
 
     if (nextJudge === "PERFECT") setPerfectCount((v) => v + 1);
     if (nextJudge === "GREAT") setGreatCount((v) => v + 1);
@@ -731,9 +842,21 @@ useEffect(() => {
     completeMission("daily4");
 
     if (character.type === "attack") {
-      setAttackSuccess(true);
-      setTimeout(() => setAttackSuccess(false), 900);
-      setRivalScore((prev) => Math.max(0, prev - 220));
+      if ((battleMode === "quick" || battleMode === "room") && onlineRoomCode) {
+        socket.emit("useSkill", {
+          roomCode: onlineRoomCode,
+          skillId: character.id,
+          skillName: character.active,
+        });
+
+        socket.emit("attackSuccess", {
+          roomCode: onlineRoomCode,
+        });
+      } else {
+        setAttackSuccess(true);
+        setTimeout(() => setAttackSuccess(false), 900);
+        setRivalScore((prev) => Math.max(0, prev - 220));
+      }
     }
 
     setTimeout(() => setSkillActive(null), 6000);
@@ -774,6 +897,13 @@ useEffect(() => {
     });
     setCoins((prev) => prev + rewardCoins);
     completeMission("daily5");
+
+    if ((battleMode === "quick" || battleMode === "room") && onlineRoomCode) {
+      socket.emit("battleEnded", {
+        roomCode: onlineRoomCode,
+      });
+    }
+
     setScreen("result");
   }
 
@@ -786,26 +916,26 @@ useEffect(() => {
       const elapsed = clamp((time - battleStartedAt) / 1000, 0, BATTLE_DURATION);
       setBattleElapsed(elapsed);
 
-      const aiPower =
-        battleMode === "ai"
-          ? aiDifficulty === "EASY"
-            ? 68
-            : aiDifficulty === "NORMAL"
-              ? 86
-              : 105
-          : 93;
+      if (battleMode === "ai") {
+        const aiPower =
+          aiDifficulty === "EASY" ? 68 : aiDifficulty === "NORMAL" ? 86 : 105;
 
-      setRivalScore(Math.max(0, Math.floor(elapsed * aiPower + Math.sin(elapsed * 1.7) * 90)));
+        setRivalScore(
+          Math.max(0, Math.floor(elapsed * aiPower + Math.sin(elapsed * 1.7) * 90))
+        );
+      }
 
       setNotes((prev) =>
         prev.map((n) => {
           if (n.hit || n.missed) return n;
+
           if (elapsed > n.time + GOOD_WINDOW) {
             setMissCount((v) => v + 1);
             setJudge("MISS");
             setCombo(0);
             return { ...n, missed: true };
           }
+
           return n;
         })
       );
@@ -888,13 +1018,22 @@ useEffect(() => {
 
             <div className="sideMenu">
               <button onClick={() => setMenuOpen(true)}>☰</button>
-              <button className={missionNotice ? "hasNotice" : ""} onClick={() => setMissionOpen(true)}>
+              <button
+                className={missionNotice ? "hasNotice" : ""}
+                onClick={() => setMissionOpen(true)}
+              >
                 🎯
               </button>
-              <button className={friendNotice ? "hasNotice" : ""} onClick={() => setFriendOpen(true)}>
+              <button
+                className={friendNotice ? "hasNotice" : ""}
+                onClick={() => setFriendOpen(true)}
+              >
                 👥
               </button>
-              <button className={mailNotice ? "hasNotice" : ""} onClick={() => setMailOpen(true)}>
+              <button
+                className={mailNotice ? "hasNotice" : ""}
+                onClick={() => setMailOpen(true)}
+              >
                 ✉️
               </button>
             </div>
@@ -928,11 +1067,15 @@ useEffect(() => {
 
         {screen === "tutorial" && (
           <div className="screen tutorialScreen">
-            <button className="backButton" onClick={() => setScreen("home")}>←</button>
+            <button className="backButton" onClick={() => setScreen("home")}>
+              ←
+            </button>
             <p className="eyebrow">TUTORIAL</p>
             <h1>{tutorialPages[tutorialPage].title}</h1>
             <div className="tutorialCard">
-              <strong>{tutorialPage + 1} / {tutorialPages.length}</strong>
+              <strong>
+                {tutorialPage + 1} / {tutorialPages.length}
+              </strong>
               <p>{tutorialPages[tutorialPage].desc}</p>
             </div>
             <div className="tutorialDots">
@@ -954,37 +1097,39 @@ useEffect(() => {
 
         {screen === "battleMenu" && (
           <div className="screen battleMenuScreen">
-            <button className="backButton" onClick={() => setScreen("home")}>←</button>
+            <button className="backButton" onClick={() => setScreen("home")}>
+              ←
+            </button>
             <p className="eyebrow">BATTLE</p>
             <h1>배틀 선택</h1>
 
-           <button
-  className="battleModeCard"
-  onClick={() => {
-    setBattleMode("quick");
-    setMatchingText("상대를 찾는 중...");
-    setScreen("quickMatching");
+            <button
+              className="battleModeCard"
+              onClick={() => {
+                setBattleMode("quick");
+                setMatchingText("상대를 찾는 중...");
+                setScreen("quickMatching");
 
-    socket.emit("quickMatch", {
-      nickname: profile.nickname,
-      avatar: profile.avatar,
-    });
-  }}
->
-  <strong>빠른 대전</strong>
-  <span>랜덤 상대를 찾아서 배틀</span>
-</button>
+                socket.emit("quickMatch", {
+                  nickname: profile.nickname,
+                  avatar: profile.avatar,
+                });
+              }}
+            >
+              <strong>빠른 대전</strong>
+              <span>랜덤 상대를 찾아서 배틀</span>
+            </button>
 
             <button
-  className="battleModeCard"
-  onClick={() => {
-    setBattleMode("room");
-    setScreen("roomCodeInput");
-  }}
->
-  <strong>배틀 룸</strong>
-  <span>방 코드를 입력하여 친구와 함께 배틀</span>
-</button>
+              className="battleModeCard"
+              onClick={() => {
+                setBattleMode("room");
+                setScreen("roomCodeInput");
+              }}
+            >
+              <strong>배틀 룸</strong>
+              <span>방 코드를 입력하여 친구와 함께 배틀</span>
+            </button>
 
             <button
               className="battleModeCard"
@@ -998,70 +1143,80 @@ useEffect(() => {
             </button>
           </div>
         )}
-{screen === "roomCodeInput" && (
-  <div className="screen roomCodeInputScreen">
-    <button className="backButton" onClick={() => setScreen("battleMenu")}>
-      ←
-    </button>
 
-    <p className="eyebrow">BATTLE ROOM</p>
-    <h1>방 코드 입력</h1>
-    <p className="subText">
-      친구와 같은 방 코드를 입력하면 같은 배틀 룸으로 입장해.
-    </p>
-
-    <div className="bigRoomCodeBox">
-      <label>ROOM CODE</label>
-      <input
-        value={roomCode}
-        onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-        maxLength={8}
-        placeholder="BEAT"
-      />
-    </div>
-
-    <div className="roomGuideBox">
-      <p>방을 먼저 만든 사람이 방장이 돼.</p>
-      <p>방장은 로비에서 음악을 선택하거나 랜덤으로 고를 수 있어.</p>
-      <p>양쪽 모두 캐릭터 선택 후 준비하면 배틀이 시작돼.</p>
-    </div>
-
-    <button
-      className="primaryButton bottomAction"
-      onClick={() => setScreen("roomLobby")}
-    >
-      입장하기
-    </button>
-  </div>
-)}
         {screen === "quickMatching" && (
-  <div className="screen quickMatchingScreen">
-    <button
-      className="backButton"
-      onClick={() => {
-        socket.emit("cancelQuickMatch");
-        setScreen("battleMenu");
-      }}
-    >
-      ←
-    </button>
+          <div className="screen quickMatchingScreen">
+            <button
+              className="backButton"
+              onClick={() => {
+                socket.emit("cancelQuickMatch");
+                setScreen("battleMenu");
+              }}
+            >
+              ←
+            </button>
 
-    <p className="eyebrow">QUICK MATCH</p>
-    <h1>빠른 대전</h1>
+            <p className="eyebrow">QUICK MATCH</p>
+            <h1>빠른 대전</h1>
 
-    <div className="matchingCard">
-      <div className="matchingSpinner" />
-      <strong>{matchingText}</strong>
-      <span>다른 플레이어가 빠른 대전에 들어오면 자동으로 매칭돼.</span>
-    </div>
-  </div>
-)}
+            <div className="matchingCard">
+              <div className="matchingSpinner" />
+              <strong>{matchingText}</strong>
+              <span>다른 플레이어가 빠른 대전에 들어오면 자동으로 매칭돼.</span>
+            </div>
+          </div>
+        )}
+
+        {screen === "roomCodeInput" && (
+          <div className="screen roomCodeInputScreen">
+            <button className="backButton" onClick={() => setScreen("battleMenu")}>
+              ←
+            </button>
+
+            <p className="eyebrow">BATTLE ROOM</p>
+            <h1>방 코드 입력</h1>
+            <p className="subText">
+              친구와 같은 방 코드를 입력하면 같은 배틀 룸으로 입장해.
+            </p>
+
+            <div className="bigRoomCodeBox">
+              <label>ROOM CODE</label>
+              <input
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                maxLength={8}
+                placeholder="BEAT"
+              />
+            </div>
+
+            <div className="roomGuideBox">
+              <p>방을 먼저 만든 사람이 방장이 돼.</p>
+              <p>방장은 로비에서 음악을 선택하거나 랜덤으로 고를 수 있어.</p>
+              <p>양쪽 모두 캐릭터 선택 후 준비하면 배틀이 시작돼.</p>
+            </div>
+
+            <button
+              className="primaryButton bottomAction"
+              onClick={() => {
+                setBattleMode("room");
+                socket.emit("createOrJoinRoom", {
+                  roomCode,
+                  nickname: profile.nickname,
+                  avatar: profile.avatar,
+                });
+              }}
+            >
+              입장하기
+            </button>
+          </div>
+        )}
+
         {screen === "quickLobby" && (
           <LobbyScreen
             title="빠른 대전"
-            subtitle="음악을 확인하고 캐릭터를 선택해."
+            subtitle="상대가 매칭됐어. 캐릭터를 선택하고 준비해."
             profile={profile}
-            opponentName="Random Riser"
+            opponentName="Matched Riser"
             opponentAvatar="R"
             selectedMusic={selectedMusic}
             setSelectedMusic={setSelectedMusic}
@@ -1069,21 +1224,24 @@ useEffect(() => {
             setMusicOpen={setMusicOpen}
             selectedCharacters={selectedCharacters}
             toggleCharacter={(id) => toggleCharacter(id, "player")}
-            onBack={() => setScreen("battleMenu")}
+            onBack={() => {
+              socket.emit("leaveRoom");
+              setScreen("battleMenu");
+            }}
             onStart={() => {
-  if (!onlineRoomCode) return;
+              if (!onlineRoomCode) return;
 
-  socket.emit("selectCharacters", {
-    roomCode: onlineRoomCode,
-    characters: selectedCharacters,
-  });
+              socket.emit("selectCharacters", {
+                roomCode: onlineRoomCode,
+                characters: selectedCharacters,
+              });
 
-  socket.emit("playerReady", {
-    roomCode: onlineRoomCode,
-    ready: true,
-  });
-}}
-startLabel="준비 완료"
+              socket.emit("playerReady", {
+                roomCode: onlineRoomCode,
+                ready: true,
+              });
+            }}
+            startLabel="준비 완료"
           />
         )}
 
@@ -1102,15 +1260,32 @@ startLabel="준비 완료"
             setMusicOpen={setMusicOpen}
             selectedCharacters={selectedCharacters}
             toggleCharacter={(id) => toggleCharacter(id, "player")}
-            onBack={() => setScreen("battleMenu")}
-            onStart={() => startBattle("room")}
+            onBack={() => {
+              socket.emit("leaveRoom");
+              setScreen("battleMenu");
+            }}
+            onStart={() => {
+              if (!onlineRoomCode) return;
+
+              socket.emit("selectCharacters", {
+                roomCode: onlineRoomCode,
+                characters: selectedCharacters,
+              });
+
+              socket.emit("playerReady", {
+                roomCode: onlineRoomCode,
+                ready: true,
+              });
+            }}
             startLabel="준비 완료"
           />
         )}
 
         {screen === "aiLobby" && (
           <div className="screen lobbyScreen">
-            <button className="backButton" onClick={() => setScreen("battleMenu")}>←</button>
+            <button className="backButton" onClick={() => setScreen("battleMenu")}>
+              ←
+            </button>
             <p className="eyebrow">AI BATTLE</p>
             <h1>AI 배틀 설정</h1>
 
@@ -1140,27 +1315,27 @@ startLabel="준비 완료"
               setMusicOpen={setMusicOpen}
             />
 
-<div className="aiCharacterScrollArea">
-  <CharacterSelector
-    title="내 캐릭터"
-    selectedCharacters={selectedCharacters}
-    toggleCharacter={(id) => toggleCharacter(id, "player")}
-  />
+            <div className="aiCharacterScrollArea">
+              <CharacterSelector
+                title="내 캐릭터"
+                selectedCharacters={selectedCharacters}
+                toggleCharacter={(id) => toggleCharacter(id, "player")}
+              />
 
-  <CharacterSelector
-    title="AI 캐릭터"
-    selectedCharacters={aiCharacters}
-    toggleCharacter={(id) => toggleCharacter(id, "ai")}
-  />
-</div>
+              <CharacterSelector
+                title="AI 캐릭터"
+                selectedCharacters={aiCharacters}
+                toggleCharacter={(id) => toggleCharacter(id, "ai")}
+              />
+            </div>
 
-<button
-  className="primaryButton aiFloatingStart"
-  disabled={!selectedCharacters.length || !aiCharacters.length}
-  onClick={() => startBattle("ai")}
->
-  AI 배틀 시작
-</button>
+            <button
+              className="primaryButton aiFloatingStart"
+              disabled={!selectedCharacters.length || !aiCharacters.length}
+              onClick={() => startBattle("ai")}
+            >
+              AI 배틀 시작
+            </button>
           </div>
         )}
 
@@ -1175,7 +1350,9 @@ startLabel="준비 완료"
               </div>
 
               <div className="battleScore">
-                <strong>{myScore} : {rivalScore}</strong>
+                <strong>
+                  {myScore} : {rivalScore}
+                </strong>
                 <span>{Math.max(0, BATTLE_DURATION - battleElapsed).toFixed(1)}s</span>
               </div>
 
@@ -1190,18 +1367,18 @@ startLabel="준비 완료"
             <div className="battleMusicName">{selectedMusic.title}</div>
 
             <div className="perspectiveStage">
-            <div className="feverRail top">
-  <div style={{ width: `${fever}%` }} />
-</div>
+              <div className="feverRail top">
+                <div style={{ width: `${fever}%` }} />
+              </div>
 
               <div className="lanePerspective">
-  <div className="laneOuter left" />
-  <div className="laneOuter right" />
+                <div className="laneOuter left" />
+                <div className="laneOuter right" />
 
-  <div className="laneDivider l1" />
-  <div className="laneDivider l2" />
-  <div className="laneDivider l3" />
-  <div className="judgeBar" />
+                <div className="laneDivider l1" />
+                <div className="laneDivider l2" />
+                <div className="laneDivider l3" />
+                <div className="judgeBar" />
 
                 {notes
                   .filter(
@@ -1212,13 +1389,19 @@ startLabel="준비 완료"
                       battleElapsed <= note.time + NOTE_EXIT_AFTER
                   )
                   .map((note) => (
-                    <div key={note.id} className="battleNote" style={getNoteStyle(note)} />
+                    <div
+                      key={note.id}
+                      className="battleNote"
+                      style={getNoteStyle(note)}
+                    />
                   ))}
 
                 {[0, 1, 2, 3].map((lane) => (
                   <button
                     key={lane}
-                    className={`hitZone lane${lane} ${pressedLane === lane ? "pressed" : ""}`}
+                    className={`hitZone lane${lane} ${
+                      pressedLane === lane ? "pressed" : ""
+                    }`}
                     onPointerDown={() => hitLane(lane)}
                   />
                 ))}
@@ -1268,16 +1451,37 @@ startLabel="준비 완료"
             </div>
 
             <div className="judgeResultGrid">
-              <div><span>PERFECT</span><strong>{result.perfect}</strong></div>
-              <div><span>GREAT</span><strong>{result.great}</strong></div>
-              <div><span>GOOD</span><strong>{result.good}</strong></div>
-              <div><span>MISS</span><strong>{result.miss}</strong></div>
+              <div>
+                <span>PERFECT</span>
+                <strong>{result.perfect}</strong>
+              </div>
+              <div>
+                <span>GREAT</span>
+                <strong>{result.great}</strong>
+              </div>
+              <div>
+                <span>GOOD</span>
+                <strong>{result.good}</strong>
+              </div>
+              <div>
+                <span>MISS</span>
+                <strong>{result.miss}</strong>
+              </div>
             </div>
 
             <div className="rewardBox">
-              <div><span>MAX COMBO</span><strong>{result.maxCombo}</strong></div>
-              <div><span>EXP</span><strong>+{result.exp}</strong></div>
-              <div><span>COIN</span><strong>+{result.coins}</strong></div>
+              <div>
+                <span>MAX COMBO</span>
+                <strong>{result.maxCombo}</strong>
+              </div>
+              <div>
+                <span>EXP</span>
+                <strong>+{result.exp}</strong>
+              </div>
+              <div>
+                <span>COIN</span>
+                <strong>+{result.coins}</strong>
+              </div>
             </div>
 
             <div className="opponentFollowBox">
@@ -1301,11 +1505,19 @@ startLabel="준비 완료"
         )}
 
         {screen === "event" && (
-          <Placeholder title="이벤트" desc="이벤트 모드는 나중에 추가할 예정이야." onBack={() => setScreen("home")} />
+          <Placeholder
+            title="이벤트"
+            desc="이벤트 모드는 나중에 추가할 예정이야."
+            onBack={() => setScreen("home")}
+          />
         )}
 
         {screen === "audition" && (
-          <Placeholder title="오디션" desc="오디션 / 캐릭터 뽑기 모드는 나중에 추가할 예정이야." onBack={() => setScreen("home")} />
+          <Placeholder
+            title="오디션"
+            desc="오디션 / 캐릭터 뽑기 모드는 나중에 추가할 예정이야."
+            onBack={() => setScreen("home")}
+          />
         )}
 
         {profileOpen && (
@@ -1314,17 +1526,28 @@ startLabel="준비 완료"
               <div className={`avatarFrame big ${profile.border}`}>
                 <div className="avatar">{profile.avatar}</div>
               </div>
-              <button className="editProfileButton" onClick={() => setProfileEditOpen(true)}>
+              <button
+                className="editProfileButton"
+                onClick={() => setProfileEditOpen(true)}
+              >
                 ✎
               </button>
             </div>
 
             <h2>{profile.nickname}</h2>
-            <p>승률 {winRate}% · {profile.wins}승 {profile.losses}패</p>
+            <p>
+              승률 {winRate}% · {profile.wins}승 {profile.losses}패
+            </p>
 
             <div className="profileStats">
-              <div><strong>{profile.followers}</strong><span>팔로워</span></div>
-              <div><strong>{profile.following}</strong><span>팔로우</span></div>
+              <div>
+                <strong>{profile.followers}</strong>
+                <span>팔로워</span>
+              </div>
+              <div>
+                <strong>{profile.following}</strong>
+                <span>팔로우</span>
+              </div>
             </div>
 
             <button className="profileLoginButton">Google 계정 연동</button>
@@ -1341,20 +1564,45 @@ startLabel="준비 완료"
           <Modal onClose={() => setProfileEditOpen(false)}>
             <h2>프로필 편집</h2>
             <div className="tabRow">
-              <button className={profileEditTab === "avatar" ? "active" : ""} onClick={() => setProfileEditTab("avatar")}>사진</button>
-              <button className={profileEditTab === "border" ? "active" : ""} onClick={() => setProfileEditTab("border")}>테두리</button>
+              <button
+                className={profileEditTab === "avatar" ? "active" : ""}
+                onClick={() => setProfileEditTab("avatar")}
+              >
+                사진
+              </button>
+              <button
+                className={profileEditTab === "border" ? "active" : ""}
+                onClick={() => setProfileEditTab("border")}
+              >
+                테두리
+              </button>
             </div>
 
             {profileEditTab === "avatar" ? (
               <div className="avatarPickGrid">
                 {["D", "R", "M", "J", "L", "K"].map((avatar) => (
-                  <button key={avatar} onClick={() => setProfile((p) => ({ ...p, avatar }))}>{avatar}</button>
+                  <button
+                    key={avatar}
+                    onClick={() => setProfile((p) => ({ ...p, avatar }))}
+                  >
+                    {avatar}
+                  </button>
                 ))}
               </div>
             ) : (
               <div className="avatarPickGrid">
                 {["neon", "gold", "purple", "plain"].map((border) => (
-                  <button key={border} onClick={() => setProfile((p) => ({ ...p, border: border as Profile["border"] }))}>{border}</button>
+                  <button
+                    key={border}
+                    onClick={() =>
+                      setProfile((p) => ({
+                        ...p,
+                        border: border as Profile["border"],
+                      }))
+                    }
+                  >
+                    {border}
+                  </button>
                 ))}
               </div>
             )}
@@ -1366,15 +1614,26 @@ startLabel="준비 완료"
             <h2>메뉴</h2>
             <div className="settingRow">
               <span>사운드</span>
-              <input type="range" min="0" max="100" value={sound} onChange={(e) => setSound(Number(e.target.value))} />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={sound}
+                onChange={(e) => setSound(Number(e.target.value))}
+              />
             </div>
             <div className="settingRow">
               <span>진동</span>
-              <button className={vibration ? "switch on" : "switch"} onClick={() => setVibration((v) => !v)}>
+              <button
+                className={vibration ? "switch on" : "switch"}
+                onClick={() => setVibration((v) => !v)}
+              >
                 {vibration ? "ON" : "OFF"}
               </button>
             </div>
-            <button className="menuListButton" onClick={() => setScreen("tutorial")}>튜토리얼 다시 보기</button>
+            <button className="menuListButton" onClick={() => setScreen("tutorial")}>
+              튜토리얼 다시 보기
+            </button>
             <button className="menuListButton">고객 지원</button>
             <button className="menuListButton danger">로그아웃</button>
           </Modal>
@@ -1391,7 +1650,10 @@ startLabel="준비 완료"
                     <span>{m.desc}</span>
                     <small>{m.reward}</small>
                   </div>
-                  <button disabled={!m.done || m.claimed} onClick={() => claimMission(m.id)}>
+                  <button
+                    disabled={!m.done || m.claimed}
+                    onClick={() => claimMission(m.id)}
+                  >
                     {m.claimed ? "완료" : m.done ? "받기" : "진행중"}
                   </button>
                 </div>
@@ -1404,10 +1666,15 @@ startLabel="준비 완료"
           <Modal onClose={() => setFriendOpen(false)}>
             <h2>친구</h2>
             <div className="friendSearch">
-              <input value={friendSearch} onChange={(e) => setFriendSearch(e.target.value)} placeholder="친구 닉네임 검색" />
+              <input
+                value={friendSearch}
+                onChange={(e) => setFriendSearch(e.target.value)}
+                placeholder="친구 닉네임 검색"
+              />
               <button
                 onClick={() => {
                   if (!friendSearch.trim()) return;
+
                   setFriends((prev) => [
                     ...prev,
                     {
@@ -1418,6 +1685,7 @@ startLabel="준비 완료"
                       giftedToday: false,
                     },
                   ]);
+
                   setFriendSearch("");
                 }}
               >
@@ -1427,26 +1695,34 @@ startLabel="준비 완료"
 
             <h3>맞팔 친구</h3>
             <div className="friendList">
-              {friends.filter((f) => f.mutual).map((f) => (
-                <div key={f.id} className="friendItem">
-                  <div className="avatarFrame small purple"><div className="avatar">{f.avatar}</div></div>
-                  <strong>{f.nickname}</strong>
-                  <button disabled={f.giftedToday} onClick={() => sendGift(f.id)}>
-                    {f.giftedToday ? "완료" : "젬 선물"}
-                  </button>
-                </div>
-              ))}
+              {friends
+                .filter((f) => f.mutual)
+                .map((f) => (
+                  <div key={f.id} className="friendItem">
+                    <div className="avatarFrame small purple">
+                      <div className="avatar">{f.avatar}</div>
+                    </div>
+                    <strong>{f.nickname}</strong>
+                    <button disabled={f.giftedToday} onClick={() => sendGift(f.id)}>
+                      {f.giftedToday ? "완료" : "젬 선물"}
+                    </button>
+                  </div>
+                ))}
             </div>
 
             <h3>나를 팔로우한 사람</h3>
             <div className="friendList">
-              {friends.filter((f) => !f.mutual).map((f) => (
-                <div key={f.id} className="friendItem">
-                  <div className="avatarFrame small"><div className="avatar">{f.avatar}</div></div>
-                  <strong>{f.nickname}</strong>
-                  <button onClick={() => followFriend(f.id)}>맞팔</button>
-                </div>
-              ))}
+              {friends
+                .filter((f) => !f.mutual)
+                .map((f) => (
+                  <div key={f.id} className="friendItem">
+                    <div className="avatarFrame small">
+                      <div className="avatar">{f.avatar}</div>
+                    </div>
+                    <strong>{f.nickname}</strong>
+                    <button onClick={() => followFriend(f.id)}>맞팔</button>
+                  </div>
+                ))}
             </div>
           </Modal>
         )}
@@ -1457,7 +1733,9 @@ startLabel="준비 완료"
             <div className="mailList">
               {mails.map((m) => (
                 <div key={m.id} className="mailItem">
-                  <div className="avatarFrame small purple"><div className="avatar">{m.avatar}</div></div>
+                  <div className="avatarFrame small purple">
+                    <div className="avatar">{m.avatar}</div>
+                  </div>
                   <div>
                     <strong>{m.from}</strong>
                     <span>{m.text}</span>
@@ -1486,8 +1764,13 @@ function Modal({
 }) {
   return (
     <div className="modalBackdrop" onClick={onClose}>
-      <div className={`profileModal ${className}`} onClick={(e) => e.stopPropagation()}>
-        <button className="modalClose" onClick={onClose}>×</button>
+      <div
+        className={`profileModal ${className}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="modalClose" onClick={onClose}>
+          ×
+        </button>
         {children}
       </div>
     </div>
@@ -1522,7 +1805,9 @@ function MusicSelector({
       <div className="sectionTitle">
         <button className="musicToggle" onClick={() => setMusicOpen(!musicOpen)}>
           <strong>{selectedMusic.title}</strong>
-          <span>BPM {selectedMusic.bpm} · {selectedMusic.difficulty}</span>
+          <span>
+            BPM {selectedMusic.bpm} · {selectedMusic.difficulty}
+          </span>
         </button>
         <button onClick={() => setSelectedMusic(getRandomMusic())}>랜덤</button>
       </div>
@@ -1539,7 +1824,9 @@ function MusicSelector({
               }}
             >
               <strong>{track.title}</strong>
-              <span>BPM {track.bpm} · {track.difficulty}</span>
+              <span>
+                BPM {track.bpm} · {track.difficulty}
+              </span>
             </button>
           ))}
         </div>
@@ -1571,11 +1858,14 @@ function CharacterSelector({
       <div className="selectedCharacterPreview horizontal">
         {[0, 1].map((slot) => {
           const c = picked[slot];
+
           return (
             <div key={slot} className="selectedHero">
               {c ? (
                 <>
-                  <div className="heroFace" style={{ background: c.color }}>{c.emoji}</div>
+                  <div className="heroFace" style={{ background: c.color }}>
+                    {c.emoji}
+                  </div>
                   <div>
                     <strong>{c.name}</strong>
                     <span>{c.passive}</span>
@@ -1642,7 +1932,9 @@ function LobbyScreen({
 }) {
   return (
     <div className="screen lobbyScreen">
-      <button className="backButton" onClick={onBack}>←</button>
+      <button className="backButton" onClick={onBack}>
+        ←
+      </button>
       <p className="eyebrow">BATTLE READY</p>
       <h1>{title}</h1>
       <p className="subText">{subtitle}</p>
@@ -1662,7 +1954,11 @@ function LobbyScreen({
       {roomCode !== undefined && setRoomCode && (
         <div className="roomCodeBox">
           <span>방 코드</span>
-          <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} maxLength={8} />
+          <input
+            value={roomCode}
+            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+            maxLength={8}
+          />
         </div>
       )}
 
@@ -1679,7 +1975,11 @@ function LobbyScreen({
         toggleCharacter={toggleCharacter}
       />
 
-      <button className="primaryButton bottomAction" disabled={!selectedCharacters.length} onClick={onStart}>
+      <button
+        className="primaryButton bottomAction"
+        disabled={!selectedCharacters.length}
+        onClick={onStart}
+      >
         {startLabel}
       </button>
     </div>
@@ -1697,7 +1997,9 @@ function Placeholder({
 }) {
   return (
     <div className="screen placeholderScreen">
-      <button className="backButton" onClick={onBack}>←</button>
+      <button className="backButton" onClick={onBack}>
+        ←
+      </button>
       <h1>{title}</h1>
       <p>{desc}</p>
     </div>
