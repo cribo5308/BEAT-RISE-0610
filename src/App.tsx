@@ -4,6 +4,8 @@ import type { Session } from "@supabase/supabase-js";
 import "./App.css";
 import { socket } from "./socket";
 import { supabase } from "./supabaseClient";
+import { socket } from "./socket";
+import { supabase } from "./supabaseClient";
 
 type Screen =
   | "home"
