@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
+import type { Session } from "@supabase/supabase-js";
 import "./App.css";
 import { socket } from "./socket";
 import { supabase } from "./supabaseClient";
-import type { Session } from "@supabase/supabase-js";
 
 type Screen =
   | "home"
@@ -72,6 +72,7 @@ type ResultData = {
   maxCombo: number;
   exp: number;
   coins: number;
+  reason?: "timeUp" | "surrender" | "opponentSurrender";
 };
 
 type Friend = {
@@ -244,29 +245,31 @@ export default function App() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [nicknameDraft, setNicknameDraft] = useState("Guest");
+  const [nicknameSaving, setNicknameSaving] = useState(false);
 
   const [onlineRoomCode, setOnlineRoomCode] = useState("");
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
   const [matchingText, setMatchingText] = useState("상대를 찾는 중...");
 
   const [onlineOpponentProfile, setOnlineOpponentProfile] = useState({
-  nickname: "Rival",
-  avatar: "R",
-  border: "purple" as Profile["border"],
-  level: 1,
-});
-  
-const [profile, setProfile] = useState<Profile>({
-  nickname: "Guest",
-  avatar: "G",
-  border: "neon",
-  level: 1,
-  exp: 0,
-  followers: 0,
-  following: 0,
-  wins: 0,
-  losses: 0,
-});
+    nickname: "Rival",
+    avatar: "R",
+    border: "purple" as Profile["border"],
+    level: 1,
+  });
+
+  const [profile, setProfile] = useState<Profile>({
+    nickname: "Guest",
+    avatar: "G",
+    border: "neon",
+    level: 1,
+    exp: 0,
+    followers: 0,
+    following: 0,
+    wins: 0,
+    losses: 0,
+  });
 
   const [gems, setGems] = useState(120);
   const [coins, setCoins] = useState(3200);
@@ -293,6 +296,8 @@ const [profile, setProfile] = useState<Profile>({
   >(null);
 
   const turntableRef = useRef<HTMLDivElement | null>(null);
+  const battleFinishedRef = useRef(false);
+
   const dragRef = useRef({
     dragging: false,
     moved: false,
@@ -310,9 +315,7 @@ const [profile, setProfile] = useState<Profile>({
   const [musicOpen, setMusicOpen] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack>(musicTracks[0]);
 
-  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([
-    "rio",
-  ]);
+  const [selectedCharacters, setSelectedCharacters] = useState<string[]>(["rio"]);
   const [aiDifficulty, setAiDifficulty] = useState<"EASY" | "NORMAL" | "HARD">(
     "NORMAL"
   );
@@ -338,10 +341,10 @@ const [profile, setProfile] = useState<Profile>({
 
   const [result, setResult] = useState<ResultData | null>(null);
 
-const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [friendSearch, setFriendSearch] = useState("");
 
-const [mails, setMails] = useState<Mail[]>([]);
+  const [mails, setMails] = useState<Mail[]>([]);
 
   const [missions, setMissions] = useState<Mission[]>([
     {
@@ -378,7 +381,7 @@ const [mails, setMails] = useState<Mail[]>([]);
     },
     {
       id: "daily5",
-      title: "승부 기록",
+      title: "결과 확인",
       desc: "결과 화면 확인",
       reward: "코인 100",
       done: false,
@@ -401,70 +404,85 @@ const [mails, setMails] = useState<Mail[]>([]);
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
 
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  async function loadSession() {
-    const { data, error } = await supabase.auth.getSession();
+    async function loadSession() {
+      const { data, error } = await supabase.auth.getSession();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (error) {
-      console.log("Supabase session error:", error.message);
+      if (error) {
+        console.log("Supabase session error:", error.message);
+        setAuthLoading(false);
+        return;
+      }
+
+      setSession(data.session);
       setAuthLoading(false);
-      return;
+
+      const user = data.session?.user;
+
+      if (user) {
+        const displayName =
+          user.user_metadata?.display_name ||
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email ||
+          "Riser";
+
+        const nextName = String(displayName).slice(0, 16);
+
+        setProfile((prev) => ({
+          ...prev,
+          nickname: nextName,
+          avatar: nextName.slice(0, 1).toUpperCase(),
+        }));
+
+        setNicknameDraft(nextName);
+      }
     }
 
-    setSession(data.session);
-    setAuthLoading(false);
+    loadSession();
 
-    const user = data.session?.user;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
 
-    if (user) {
-      const displayName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email ||
-        "Riser";
+      const user = nextSession?.user;
 
-      setProfile((prev) => ({
-        ...prev,
-        nickname: displayName,
-        avatar: displayName.slice(0, 1).toUpperCase(),
-      }));
-    }
-  }
+      if (user) {
+        const displayName =
+          user.user_metadata?.display_name ||
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email ||
+          "Riser";
 
-  loadSession();
+        const nextName = String(displayName).slice(0, 16);
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-    setSession(nextSession);
-    setAuthLoading(false);
+        setProfile((prev) => ({
+          ...prev,
+          nickname: nextName,
+          avatar: nextName.slice(0, 1).toUpperCase(),
+        }));
 
-    const user = nextSession?.user;
+        setNicknameDraft(nextName);
+      }
+    });
 
-    if (user) {
-      const displayName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email ||
-        "Riser";
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
-      setProfile((prev) => ({
-        ...prev,
-        nickname: displayName,
-        avatar: displayName.slice(0, 1).toUpperCase(),
-      }));
-    }
-  });
+  useEffect(() => {
+    setNicknameDraft(profile.nickname);
+  }, [profile.nickname, profileOpen]);
 
-  return () => {
-    mounted = false;
-    subscription.unsubscribe();
-  };
-}, []);
   useEffect(() => {
     function handleConnect() {
       console.log("✅ socket connected:", socket.id);
@@ -498,17 +516,17 @@ useEffect(() => {
     function handleQuickMatchFound(payload: {
       roomCode: string;
       side: OnlineSide;
-     state: {
-  musicId?: string;
-  noteSeed?: number;
-  players?: {
-    side: OnlineSide;
-    nickname: string;
-    avatar: string;
-    border?: Profile["border"];
-    level?: number;
-  }[];
-};
+      state: {
+        musicId?: string;
+        noteSeed?: number;
+        players?: {
+          side: OnlineSide;
+          nickname: string;
+          avatar: string;
+          border?: Profile["border"];
+          level?: number;
+        }[];
+      };
     }) {
       setOnlineRoomCode(payload.roomCode);
       setRoomCode(payload.roomCode);
@@ -529,20 +547,21 @@ useEffect(() => {
     function handleJoinedRoom(payload: {
       roomCode: string;
       side: OnlineSide;
-     state: {
-  musicId?: string;
-  noteSeed?: number;
-  players?: {
-    side: OnlineSide;
-    nickname: string;
-    avatar: string;
-    border?: Profile["border"];
-    level?: number;
-  }[];
-};
+      state: {
+        musicId?: string;
+        noteSeed?: number;
+        players?: {
+          side: OnlineSide;
+          nickname: string;
+          avatar: string;
+          border?: Profile["border"];
+          level?: number;
+        }[];
+      };
     }) {
       setOnlineRoomCode(payload.roomCode);
       setMyOnlineSide(payload.side);
+      updateOnlineOpponentProfile(payload.state?.players, payload.side);
 
       const matchedMusic = musicTracks.find(
         (track) => track.id === payload.state?.musicId
@@ -577,27 +596,27 @@ useEffect(() => {
       startBattle(mode, payload.noteSeed);
     }
 
-function handleRoomState(payload: {
-  roomCode: string;
-  players?: {
-    side: OnlineSide;
-    nickname: string;
-    avatar: string;
-    border?: Profile["border"];
-    level?: number;
-  }[];
-  scores?: {
-    A: number;
-    B: number;
-  };
-}) {
-  updateOnlineOpponentProfile(payload.players, myOnlineSide);
+    function handleRoomState(payload: {
+      roomCode: string;
+      players?: {
+        side: OnlineSide;
+        nickname: string;
+        avatar: string;
+        border?: Profile["border"];
+        level?: number;
+      }[];
+      scores?: {
+        A: number;
+        B: number;
+      };
+    }) {
+      updateOnlineOpponentProfile(payload.players, myOnlineSide);
 
-  if (!payload.scores || !myOnlineSide) return;
+      if (!payload.scores || !myOnlineSide) return;
 
-  const rivalSide = myOnlineSide === "A" ? "B" : "A";
-  setRivalScore(payload.scores[rivalSide]);
-}
+      const rivalSide = myOnlineSide === "A" ? "B" : "A";
+      setRivalScore(payload.scores[rivalSide]);
+    }
 
     function handleScoreSync(payload: {
       side: OnlineSide;
@@ -631,6 +650,31 @@ function handleRoomState(payload: {
       }
     }
 
+    function handleBattleEnded(payload: {
+      reason?: "timeUp" | "surrender";
+      surrenderSide?: OnlineSide | null;
+      scores?: {
+        A: number;
+        B: number;
+      };
+    }) {
+      if (screen !== "battle") return;
+
+      if (payload.scores && myOnlineSide) {
+        const rivalSide = myOnlineSide === "A" ? "B" : "A";
+        setRivalScore(payload.scores[rivalSide]);
+      }
+
+      if (payload.reason === "surrender" && payload.surrenderSide) {
+        if (payload.surrenderSide !== myOnlineSide) {
+          finishBattle({
+            opponentSurrendered: true,
+            notifyServer: false,
+          });
+        }
+      }
+    }
+
     socket.on("quickMatchWaiting", handleQuickMatchWaiting);
     socket.on("quickMatchFound", handleQuickMatchFound);
     socket.on("joinedRoom", handleJoinedRoom);
@@ -638,6 +682,7 @@ function handleRoomState(payload: {
     socket.on("roomState", handleRoomState);
     socket.on("scoreSync", handleScoreSync);
     socket.on("attackSuccess", handleAttackSuccess);
+    socket.on("battleEnded", handleBattleEnded);
 
     return () => {
       socket.off("quickMatchWaiting", handleQuickMatchWaiting);
@@ -647,69 +692,106 @@ function handleRoomState(payload: {
       socket.off("roomState", handleRoomState);
       socket.off("scoreSync", handleScoreSync);
       socket.off("attackSuccess", handleAttackSuccess);
+      socket.off("battleEnded", handleBattleEnded);
     };
-  }, [myOnlineSide, screen]);
+  }, [myOnlineSide, screen, myScore, rivalScore]);
 
-async function signInWithGoogle() {
-  const redirectUrl =
-    window.location.hostname === "localhost"
-      ? "http://localhost:5173"
-      : "https://beat-rise-0610.netlify.app";
-
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: redirectUrl,
-    },
-  });
-
-  if (error) {
-    alert(`로그인 실패: ${error.message}`);
-  }
-}
-
-async function signOut() {
-  const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    alert(`로그아웃 실패: ${error.message}`);
-    return;
-  }
-
-  setSession(null);
-setProfile((prev) => ({
-  ...prev,
-  nickname: "Guest",
-  avatar: "G",
-  followers: 0,
-  following: 0,
-}));
-}
   function updateOnlineOpponentProfile(
-  players:
-    | {
-        side: OnlineSide;
-        nickname: string;
-        avatar: string;
-        border?: Profile["border"];
-        level?: number;
-      }[]
-    | undefined,
-  mySide: OnlineSide | null
-) {
-  if (!players || !mySide) return;
+    players:
+      | {
+          side: OnlineSide;
+          nickname: string;
+          avatar: string;
+          border?: Profile["border"];
+          level?: number;
+        }[]
+      | undefined,
+    mySide: OnlineSide | null
+  ) {
+    if (!players || !mySide) return;
 
-  const rival = players.find((player) => player.side !== mySide);
+    const rival = players.find((player) => player.side !== mySide);
 
-  if (!rival) return;
+    if (!rival) return;
 
-  setOnlineOpponentProfile({
-    nickname: rival.nickname || "Rival",
-    avatar: rival.avatar || "R",
-    border: rival.border || "purple",
-    level: Number(rival.level) || 1,
-  });
-}
+    setOnlineOpponentProfile({
+      nickname: rival.nickname || "Rival",
+      avatar: rival.avatar || "R",
+      border: rival.border || "purple",
+      level: Number(rival.level) || 1,
+    });
+  }
+
+  async function signInWithGoogle() {
+    const redirectUrl =
+      window.location.hostname === "localhost"
+        ? "http://localhost:5173"
+        : "https://beat-rise-0610.netlify.app";
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      alert(`로그인 실패: ${error.message}`);
+    }
+  }
+
+  async function signOut() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      alert(`로그아웃 실패: ${error.message}`);
+      return;
+    }
+
+    setSession(null);
+    setProfile((prev) => ({
+      ...prev,
+      nickname: "Guest",
+      avatar: "G",
+      followers: 0,
+      following: 0,
+    }));
+    setNicknameDraft("Guest");
+  }
+
+  async function saveNickname() {
+    const nextNickname = nicknameDraft.trim().slice(0, 16);
+
+    if (!nextNickname) {
+      alert("닉네임을 입력해줘.");
+      return;
+    }
+
+    setNicknameSaving(true);
+
+    setProfile((prev) => ({
+      ...prev,
+      nickname: nextNickname,
+      avatar: nextNickname.slice(0, 1).toUpperCase(),
+    }));
+
+    if (session) {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          display_name: nextNickname,
+          full_name: nextNickname,
+          name: nextNickname,
+        },
+      });
+
+      if (error) {
+        alert(`닉네임 저장 실패: ${error.message}`);
+      }
+    }
+
+    setNicknameSaving(false);
+  }
+
   function completeMission(id: string) {
     setMissions((prev) =>
       prev.map((m) => (m.id === id ? { ...m, done: true } : m))
@@ -871,6 +953,8 @@ setProfile((prev) => ({
   }
 
   function startBattle(mode: BattleMode, onlineSeed?: number) {
+    battleFinishedRef.current = false;
+
     const seed =
       onlineSeed ??
       selectedMusic.bpm + selectedCharacters.length * 17 + mode.length;
@@ -1001,14 +1085,38 @@ setProfile((prev) => ({
     setTimeout(() => setSkillActive(null), 6000);
   }
 
-  function finishBattle() {
+  function finishBattle(options?: {
+    surrendered?: boolean;
+    opponentSurrendered?: boolean;
+    notifyServer?: boolean;
+  }) {
+    if (battleFinishedRef.current) return;
+    battleFinishedRef.current = true;
+
+    const surrendered = options?.surrendered ?? false;
+    const opponentSurrendered = options?.opponentSurrendered ?? false;
+    const notifyServer = options?.notifyServer ?? true;
+
     const finalMy = myScore;
     const finalRival = rivalScore;
-    const victory: ResultData["victory"] =
-      finalMy === finalRival ? "DRAW" : finalMy > finalRival ? "VICTORY" : "DEFEAT";
 
-    const exp = victory === "VICTORY" ? 500 : 50;
-    const rewardCoins = victory === "VICTORY" ? 150 : 30;
+    let victory: ResultData["victory"];
+
+    if (surrendered) {
+      victory = "DEFEAT";
+    } else if (opponentSurrendered) {
+      victory = "VICTORY";
+    } else {
+      victory =
+        finalMy === finalRival
+          ? "DRAW"
+          : finalMy > finalRival
+            ? "VICTORY"
+            : "DEFEAT";
+    }
+
+    const exp = surrendered ? 0 : victory === "VICTORY" ? 500 : 50;
+    const rewardCoins = surrendered ? 0 : victory === "VICTORY" ? 150 : 30;
 
     const resultData: ResultData = {
       victory,
@@ -1021,11 +1129,18 @@ setProfile((prev) => ({
       maxCombo,
       exp,
       coins: rewardCoins,
+      reason: surrendered
+        ? "surrender"
+        : opponentSurrendered
+          ? "opponentSurrender"
+          : "timeUp",
     };
 
     setResult(resultData);
+
     setProfile((prev) => {
       const nextExp = prev.exp + exp;
+
       return {
         ...prev,
         exp: nextExp,
@@ -1034,16 +1149,33 @@ setProfile((prev) => ({
         losses: victory === "DEFEAT" ? prev.losses + 1 : prev.losses,
       };
     });
+
     setCoins((prev) => prev + rewardCoins);
     completeMission("daily5");
 
-    if ((battleMode === "quick" || battleMode === "room") && onlineRoomCode) {
+    if (
+      notifyServer &&
+      (battleMode === "quick" || battleMode === "room") &&
+      onlineRoomCode
+    ) {
       socket.emit("battleEnded", {
         roomCode: onlineRoomCode,
+        reason: surrendered ? "surrender" : "timeUp",
       });
     }
 
     setScreen("result");
+  }
+
+  function surrenderBattle() {
+    const confirmed = window.confirm("정말 항복할까요? 항복하면 즉시 패배 처리돼.");
+
+    if (!confirmed) return;
+
+    finishBattle({
+      surrendered: true,
+      notifyServer: true,
+    });
   }
 
   useEffect(() => {
@@ -1080,7 +1212,9 @@ setProfile((prev) => ({
       );
 
       if (elapsed >= BATTLE_DURATION) {
-        finishBattle();
+        finishBattle({
+          notifyServer: true,
+        });
         return;
       }
 
@@ -1110,16 +1244,16 @@ setProfile((prev) => ({
     };
   }
 
- function followFriend(friendId: string) {
-  setFriends((prev) =>
-    prev.map((f) => (f.id === friendId ? { ...f, mutual: true } : f))
-  );
+  function followFriend(friendId: string) {
+    setFriends((prev) =>
+      prev.map((f) => (f.id === friendId ? { ...f, mutual: true } : f))
+    );
 
-  setProfile((prev) => ({
-    ...prev,
-    following: prev.following + 1,
-  }));
-}
+    setProfile((prev) => ({
+      ...prev,
+      following: prev.following + 1,
+    }));
+  }
 
   function sendGift(friendId: string) {
     setFriends((prev) =>
@@ -1254,12 +1388,12 @@ setProfile((prev) => ({
                 setMatchingText("상대를 찾는 중...");
                 setScreen("quickMatching");
 
-             socket.emit("quickMatch", {
-  nickname: profile.nickname,
-  avatar: profile.avatar,
-  border: profile.border,
-  level: profile.level,
-});
+                socket.emit("quickMatch", {
+                  nickname: profile.nickname,
+                  avatar: profile.avatar,
+                  border: profile.border,
+                  level: profile.level,
+                });
               }}
             >
               <strong>빠른 대전</strong>
@@ -1346,12 +1480,12 @@ setProfile((prev) => ({
               onClick={() => {
                 setBattleMode("room");
                 socket.emit("createOrJoinRoom", {
-  roomCode,
-  nickname: profile.nickname,
-  avatar: profile.avatar,
-  border: profile.border,
-  level: profile.level,
-});
+                  roomCode,
+                  nickname: profile.nickname,
+                  avatar: profile.avatar,
+                  border: profile.border,
+                  level: profile.level,
+                });
               }}
             >
               입장하기
@@ -1364,10 +1498,10 @@ setProfile((prev) => ({
             title="빠른 대전"
             subtitle="상대가 매칭됐어. 캐릭터를 선택하고 준비해."
             profile={profile}
-           opponentName={onlineOpponentProfile.nickname}
-opponentAvatar={onlineOpponentProfile.avatar}
-opponentBorder={onlineOpponentProfile.border}
-opponentLevel={onlineOpponentProfile.level}
+            opponentName={onlineOpponentProfile.nickname}
+            opponentAvatar={onlineOpponentProfile.avatar}
+            opponentBorder={onlineOpponentProfile.border}
+            opponentLevel={onlineOpponentProfile.level}
             selectedMusic={selectedMusic}
             setSelectedMusic={setSelectedMusic}
             musicOpen={musicOpen}
@@ -1401,9 +1535,9 @@ opponentLevel={onlineOpponentProfile.level}
             subtitle="방장이 음악을 고르고 양쪽이 준비하면 시작돼."
             profile={profile}
             opponentName={onlineOpponentProfile.nickname}
-opponentAvatar={onlineOpponentProfile.avatar}
-opponentBorder={onlineOpponentProfile.border}
-opponentLevel={onlineOpponentProfile.level}
+            opponentAvatar={onlineOpponentProfile.avatar}
+            opponentBorder={onlineOpponentProfile.border}
+            opponentLevel={onlineOpponentProfile.level}
             roomCode={roomCode}
             setRoomCode={setRoomCode}
             selectedMusic={selectedMusic}
@@ -1509,14 +1643,26 @@ opponentLevel={onlineOpponentProfile.level}
               </div>
 
               <div className="battleProfile right">
-                <span>{battleMode === "ai" ? "Beat AI" : "Rival"}</span>
-                <div className="avatarFrame small purple">
-                  <div className="avatar">{battleMode === "ai" ? "AI" : "R"}</div>
+                <span>
+                  {battleMode === "ai" ? "Beat AI" : onlineOpponentProfile.nickname}
+                </span>
+                <div
+                  className={`avatarFrame small ${
+                    battleMode === "ai" ? "purple" : onlineOpponentProfile.border
+                  }`}
+                >
+                  <div className="avatar">
+                    {battleMode === "ai" ? "AI" : onlineOpponentProfile.avatar}
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="battleMusicName">{selectedMusic.title}</div>
+
+            <button className="surrenderButton" onClick={surrenderBattle}>
+              항복
+            </button>
 
             <div className="perspectiveStage">
               <div className="feverRail top">
@@ -1591,6 +1737,14 @@ opponentLevel={onlineOpponentProfile.level}
             <p className="eyebrow">BATTLE RESULT</p>
             <h1>{result.victory}</h1>
 
+            {result.reason === "surrender" && (
+              <p className="resultReason">항복으로 패배했습니다.</p>
+            )}
+
+            {result.reason === "opponentSurrender" && (
+              <p className="resultReason">상대가 항복했습니다.</p>
+            )}
+
             <div className="resultScoreBox">
               <div>
                 <small>MY SCORE</small>
@@ -1637,11 +1791,11 @@ opponentLevel={onlineOpponentProfile.level}
             </div>
 
             <div className="opponentFollowBox">
-              <div className="avatarFrame purple">
-                <div className="avatar">R</div>
+              <div className={`avatarFrame ${onlineOpponentProfile.border}`}>
+                <div className="avatar">{onlineOpponentProfile.avatar}</div>
               </div>
               <div>
-                <strong>Rival Player</strong>
+                <strong>{onlineOpponentProfile.nickname}</strong>
                 <span>상대 프로필 보기</span>
               </div>
               <button>팔로우</button>
@@ -1691,6 +1845,22 @@ opponentLevel={onlineOpponentProfile.level}
               승률 {winRate}% · {profile.wins}승 {profile.losses}패
             </p>
 
+            <div className="nicknameEditBox">
+              <label>닉네임 변경</label>
+              <div>
+                <input
+                  value={nicknameDraft}
+                  maxLength={16}
+                  onChange={(e) => setNicknameDraft(e.target.value)}
+                  placeholder="닉네임 입력"
+                />
+                <button disabled={nicknameSaving} onClick={saveNickname}>
+                  {nicknameSaving ? "저장중" : "저장"}
+                </button>
+              </div>
+              <small>로그인 여부와 상관없이 변경할 수 있어.</small>
+            </div>
+
             <div className="profileStats">
               <div>
                 <strong>{profile.followers}</strong>
@@ -1703,23 +1873,26 @@ opponentLevel={onlineOpponentProfile.level}
             </div>
 
             {authLoading ? (
-  <button className="profileLoginButton" disabled>
-    로그인 확인 중...
-  </button>
-) : session ? (
-  <button className="profileLoginButton" onClick={signOut}>
-    로그아웃
-  </button>
-) : (
-  <button className="profileLoginButton" onClick={signInWithGoogle}>
-    Google 계정으로 로그인
-  </button>
-)}
+              <button className="profileLoginButton" disabled>
+                로그인 확인 중...
+              </button>
+            ) : session ? (
+              <button className="profileLoginButton" onClick={signOut}>
+                로그아웃
+              </button>
+            ) : (
+              <button className="profileLoginButton" onClick={signInWithGoogle}>
+                Google 계정으로 로그인
+              </button>
+            )}
 
             <div className="recordPreview">
               <h3>최근 전적</h3>
-              <div>Danzy 12450 : Rival 11800 · 승리</div>
-              <div>Danzy 8900 : MikaFan 9320 · 패배</div>
+              <div>
+                {profile.wins + profile.losses > 0
+                  ? `${profile.wins}승 ${profile.losses}패`
+                  : "아직 전적이 없습니다."}
+              </div>
             </div>
           </Modal>
         )}
@@ -1744,7 +1917,7 @@ opponentLevel={onlineOpponentProfile.level}
 
             {profileEditTab === "avatar" ? (
               <div className="avatarPickGrid">
-                {["D", "R", "M", "J", "L", "K"].map((avatar) => (
+                {["G", "D", "R", "M", "J", "L", "K"].map((avatar) => (
                   <button
                     key={avatar}
                     onClick={() => setProfile((p) => ({ ...p, avatar }))}
@@ -1800,14 +1973,14 @@ opponentLevel={onlineOpponentProfile.level}
             </button>
             <button className="menuListButton">고객 지원</button>
             {session ? (
-  <button className="menuListButton danger" onClick={signOut}>
-    로그아웃
-  </button>
-) : (
-  <button className="menuListButton" onClick={signInWithGoogle}>
-    Google 로그인
-  </button>
-)}
+              <button className="menuListButton danger" onClick={signOut}>
+                로그아웃
+              </button>
+            ) : (
+              <button className="menuListButton" onClick={signInWithGoogle}>
+                Google 로그인
+              </button>
+            )}
           </Modal>
         )}
 
@@ -1847,23 +2020,23 @@ opponentLevel={onlineOpponentProfile.level}
                 onClick={() => {
                   if (!friendSearch.trim()) return;
 
-                 setFriends((prev) => [
-  ...prev,
-  {
-    id: Date.now().toString(),
-    nickname: friendSearch.trim(),
-    avatar: friendSearch.trim()[0].toUpperCase(),
-    mutual: false,
-    giftedToday: false,
-  },
-]);
+                  setFriends((prev) => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      nickname: friendSearch.trim(),
+                      avatar: friendSearch.trim()[0].toUpperCase(),
+                      mutual: false,
+                      giftedToday: false,
+                    },
+                  ]);
 
-setProfile((prev) => ({
-  ...prev,
-  following: prev.following + 1,
-}));
+                  setProfile((prev) => ({
+                    ...prev,
+                    following: prev.following + 1,
+                  }));
 
-setFriendSearch("");
+                  setFriendSearch("");
                 }}
               >
                 팔로우
@@ -1872,6 +2045,10 @@ setFriendSearch("");
 
             <h3>맞팔 친구</h3>
             <div className="friendList">
+              {friends.filter((f) => f.mutual).length === 0 && (
+                <p className="emptyText">아직 맞팔 친구가 없어.</p>
+              )}
+
               {friends
                 .filter((f) => f.mutual)
                 .map((f) => (
@@ -1887,7 +2064,7 @@ setFriendSearch("");
                 ))}
             </div>
 
-            <h3>나를 팔로우한 사람</h3>
+            <h3>내가 팔로우한 사람</h3>
             <div className="friendList">
               {friends
                 .filter((f) => !f.mutual)
@@ -1897,7 +2074,7 @@ setFriendSearch("");
                       <div className="avatar">{f.avatar}</div>
                     </div>
                     <strong>{f.nickname}</strong>
-                    <button onClick={() => followFriend(f.id)}>맞팔</button>
+                    <button onClick={() => followFriend(f.id)}>맞팔 처리</button>
                   </div>
                 ))}
             </div>
@@ -1908,6 +2085,8 @@ setFriendSearch("");
           <Modal onClose={() => setMailOpen(false)}>
             <h2>우편함</h2>
             <div className="mailList">
+              {mails.length === 0 && <p className="emptyText">우편이 없어.</p>}
+
               {mails.map((m) => (
                 <div key={m.id} className="mailItem">
                   <div className="avatarFrame small purple">
@@ -2098,7 +2277,7 @@ function LobbyScreen({
   opponentName: string;
   opponentAvatar: string;
   opponentBorder?: Profile["border"];
-opponentLevel?: number;
+  opponentLevel?: number;
   selectedMusic: MusicTrack;
   setSelectedMusic: (track: MusicTrack) => void;
   musicOpen: boolean;
@@ -2123,13 +2302,13 @@ opponentLevel?: number;
       <div className="profileVersus compact">
         <ProfileCard profile={profile} />
         <div className="vsMark">VS</div>
-       <div className="lobbyProfileCard">
-  <div className={`avatarFrame ${opponentBorder}`}>
-    <div className="avatar">{opponentAvatar}</div>
-  </div>
-  <strong>{opponentName}</strong>
-  <span>Lv.{opponentLevel}</span>
-</div>
+        <div className="lobbyProfileCard">
+          <div className={`avatarFrame ${opponentBorder}`}>
+            <div className="avatar">{opponentAvatar}</div>
+          </div>
+          <strong>{opponentName}</strong>
+          <span>Lv.{opponentLevel}</span>
+        </div>
       </div>
 
       {roomCode !== undefined && setRoomCode && (
