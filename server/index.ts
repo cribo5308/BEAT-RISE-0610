@@ -5,7 +5,6 @@ import { Server } from "socket.io";
 
 type Side = "A" | "B";
 type ProfileBorder = "neon" | "gold" | "purple" | "plain";
-
 type RoomPhase = "waiting" | "lobby" | "battle" | "result";
 
 type PlayerProfilePayload = {
@@ -107,7 +106,7 @@ function normalizeAvatar(avatar?: string, fallback = "G") {
 
   if (!trimmed) return fallback;
 
-  return trimmed.slice(0, 3);
+  return trimmed.slice(0, 3000);
 }
 
 function normalizeLevel(level?: number) {
@@ -204,6 +203,10 @@ function addPlayerToRoom(
   const alreadyInRoom = room.players.find((player) => player.socketId === socketId);
 
   if (alreadyInRoom) {
+    alreadyInRoom.nickname = normalizeNickname(payload?.nickname);
+    alreadyInRoom.avatar = normalizeAvatar(payload?.avatar, alreadyInRoom.side);
+    alreadyInRoom.border = normalizeBorder(payload?.border);
+    alreadyInRoom.level = normalizeLevel(payload?.level);
     return alreadyInRoom;
   }
 
@@ -278,7 +281,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("quickMatch", (payload: QuickMatchPayload) => {
-    console.log("quickMatch requested:", socket.id, payload);
+    console.log("quickMatch requested:", socket.id, payload?.nickname);
 
     removeFromQuickQueue(socket.id);
 
@@ -491,40 +494,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on(
-    "noteResult",
-    (payload: {
-      roomCode: string;
-      noteId: string | number;
-      rating: string;
-      scoreDelta: number;
-      combo: number;
-    }) => {
-      const roomCode = normalizeRoomCode(payload.roomCode);
-      const room = rooms.get(roomCode);
-      if (!room) return;
-
-      const player = room.players.find((item) => item.socketId === socket.id);
-      if (!player) return;
-
-      const side = player.side;
-      const scoreDelta = Math.max(0, Math.floor(Number(payload.scoreDelta) || 0));
-
-      room.scores[side] += scoreDelta;
-
-      io.to(roomCode).emit("noteResult", {
-        noteId: payload.noteId,
-        side,
-        rating: payload.rating,
-        scoreDelta,
-        combo: Number(payload.combo) || 0,
-        scores: room.scores,
-      });
-
-      emitRoomState(roomCode);
-    }
-  );
-
-  socket.on(
     "scoreSync",
     (payload: { roomCode: string; score: number }) => {
       const roomCode = normalizeRoomCode(payload.roomCode);
@@ -599,20 +568,31 @@ io.on("connection", (socket) => {
     }
   );
 
-  socket.on("battleEnded", (payload: { roomCode: string }) => {
-    const roomCode = normalizeRoomCode(payload.roomCode);
-    const room = rooms.get(roomCode);
-    if (!room) return;
+  socket.on(
+    "battleEnded",
+    (payload: {
+      roomCode: string;
+      reason?: "timeUp" | "surrender";
+    }) => {
+      const roomCode = normalizeRoomCode(payload.roomCode);
+      const room = rooms.get(roomCode);
+      if (!room) return;
 
-    room.phase = "result";
+      const player = room.players.find((item) => item.socketId === socket.id);
 
-    io.to(roomCode).emit("battleEnded", {
-      scores: room.scores,
-      state: getPublicRoomState(room),
-    });
+      room.phase = "result";
 
-    emitRoomState(roomCode);
-  });
+      io.to(roomCode).emit("battleEnded", {
+        reason: payload.reason || "timeUp",
+        surrenderSide:
+          payload.reason === "surrender" && player ? player.side : null,
+        scores: room.scores,
+        state: getPublicRoomState(room),
+      });
+
+      emitRoomState(roomCode);
+    }
+  );
 
   socket.on("leaveRoom", () => {
     removePlayer(socket.id);
