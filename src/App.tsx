@@ -640,11 +640,16 @@ useEffect(() => {
     };
   }, [myOnlineSide, screen]);
 
-  async function signInWithGoogle() {
+async function signInWithGoogle() {
+  const redirectUrl =
+    window.location.hostname === "localhost"
+      ? "http://localhost:5173"
+      : "https://beat-rise-0610.netlify.app";
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: redirectUrl,
     },
   });
 
