@@ -277,9 +277,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
-  const [profileEditTab, setProfileEditTab] = useState<"avatar" | "border">(
-    "avatar"
-  );
+ const [profileEditTab, setProfileEditTab] = useState<"avatar" | "album" | "border">(
+  "avatar"
+);
   const [missionOpen, setMissionOpen] = useState(false);
   const [friendOpen, setFriendOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
@@ -766,7 +766,29 @@ export default function App() {
       alert("닉네임을 입력해줘.");
       return;
     }
+function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>) {
+  const file = event.target.files?.[0];
 
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("이미지 파일만 선택할 수 있어.");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const imageUrl = String(reader.result);
+
+    setProfile((prev) => ({
+      ...prev,
+      avatar: imageUrl,
+    }));
+  };
+
+  reader.readAsDataURL(file);
+}
     setNicknameSaving(true);
 
     setProfile((prev) => ({
