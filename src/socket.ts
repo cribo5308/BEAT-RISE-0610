@@ -1,5 +1,32 @@
 import { io } from "socket.io-client";
 
+export type OnlineSide = "A" | "B";
+
+export type OnlineRoomPhase = "waiting" | "lobby" | "battle" | "result";
+
+export type ServerRoomPlayer = {
+  socketId: string;
+  side: OnlineSide;
+  ready: boolean;
+  characters: string[];
+  nickname: string;
+  avatar: string;
+};
+
+export type ServerRoomState = {
+  roomCode: string;
+  phase: OnlineRoomPhase;
+  players: ServerRoomPlayer[];
+  hostSide: OnlineSide;
+  musicId: string;
+  scores: {
+    A: number;
+    B: number;
+  };
+  startedAt: number | null;
+  noteSeed: number;
+};
+
 function getSocketServerUrl() {
   const envUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
 
@@ -7,7 +34,7 @@ function getSocketServerUrl() {
 
   const { protocol, hostname } = window.location;
 
-  // StackBlitz WebContainer 주소에서 프론트 포트를 서버 포트 3001로 바꿈
+  // StackBlitz WebContainer 테스트용
   if (hostname.includes("webcontainer-api.io")) {
     const serverHostname = hostname.replace(/-(\d+)(--|-)/, "-3001$2");
     return `${protocol}//${serverHostname}`;
@@ -17,27 +44,6 @@ function getSocketServerUrl() {
 }
 
 export const socket = io(getSocketServerUrl(), {
-  autoConnect: false,
+  autoConnect: true,
   transports: ["websocket", "polling"],
 });
-
-export type ServerRoomPlayer = {
-  socketId: string;
-  side: "A" | "B";
-  ready: boolean;
-  characters: string[];
-};
-
-export type ServerRoomState = {
-  roomCode: string;
-  phase: "waiting" | "select" | "bottle" | "battle" | "result";
-  players: ServerRoomPlayer[];
-  firstSide: "A" | "B" | null;
-  turnIndex: number;
-  currentTurnSide: "A" | "B" | null;
-  scores: {
-    A: number;
-    B: number;
-  };
-  startedAt: number | null;
-};
