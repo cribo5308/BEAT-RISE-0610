@@ -413,10 +413,6 @@ const [profileEditTab, setProfileEditTab] = useState<
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadSession() {
 useEffect(() => {
   let mounted = true;
 
@@ -444,6 +440,33 @@ useEffect(() => {
     }
   }
 
+  async function loadSession() {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    if (error) {
+      console.log("Supabase session error:", error.message);
+      setAuthLoading(false);
+      return;
+    }
+
+    await applyProfileFromSession(data.session);
+  }
+
+  loadSession();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    applyProfileFromSession(nextSession);
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
   async function loadSession() {
     const { data, error } = await supabase.auth.getSession();
 
