@@ -1,16 +1,15 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, PointerEvent, ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
+import "./App.css";
+import { socket } from "./socket";
+import { supabase } from "./supabaseClient";
 import {
   dbProfileToLocalProfile,
   loadOrCreateProfile,
   saveProfilePatch,
   uploadProfileAvatar,
 } from "./profileStore";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent } from "react";
-import type { Session } from "@supabase/supabase-js";
-import "./App.css";
-import { socket } from "./socket";
-import { supabase } from "./supabaseClient";
-
 
 type Screen =
   | "home"
@@ -255,7 +254,7 @@ export default function App() {
   const [nicknameDraft, setNicknameDraft] = useState("Guest");
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [onlineRoomCode, setOnlineRoomCode] = useState("");
   const [myOnlineSide, setMyOnlineSide] = useState<OnlineSide | null>(null);
@@ -286,9 +285,9 @@ const [avatarUploading, setAvatarUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
-const [profileEditTab, setProfileEditTab] = useState<
-  "avatar" | "album" | "border"
->("avatar");
+  const [profileEditTab, setProfileEditTab] = useState<
+    "avatar" | "album" | "border"
+  >("avatar");
   const [missionOpen, setMissionOpen] = useState(false);
   const [friendOpen, setFriendOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
@@ -413,86 +412,60 @@ const [profileEditTab, setProfileEditTab] = useState<
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
 
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  async function applyProfileFromSession(nextSession: Session | null) {
-    setSession(nextSession);
-    setAuthLoading(false);
+    async function applyProfileFromSession(nextSession: Session | null) {
+      setSession(nextSession);
+      setAuthLoading(false);
 
-    const user = nextSession?.user;
+      const user = nextSession?.user;
 
-    if (!user) return;
+      if (!user) return;
 
-    try {
-      const dbProfile = await loadOrCreateProfile(user.id, user.email);
+      try {
+        const dbProfile = await loadOrCreateProfile(user.id, user.email);
+
+        if (!mounted) return;
+
+        const localProfile = dbProfileToLocalProfile(dbProfile);
+
+        setProfile(localProfile);
+        setNicknameDraft(localProfile.nickname);
+        setGems(dbProfile.gems);
+        setCoins(dbProfile.coins);
+      } catch (error) {
+        console.log("프로필 불러오기 실패:", error);
+      }
+    }
+
+    async function loadSession() {
+      const { data, error } = await supabase.auth.getSession();
 
       if (!mounted) return;
 
-      const localProfile = dbProfileToLocalProfile(dbProfile);
+      if (error) {
+        console.log("Supabase session error:", error.message);
+        setAuthLoading(false);
+        return;
+      }
 
-      setProfile(localProfile);
-      setNicknameDraft(localProfile.nickname);
-      setGems(dbProfile.gems);
-      setCoins(dbProfile.coins);
-    } catch (error) {
-      console.log("프로필 불러오기 실패:", error);
-    }
-  }
-
-  async function loadSession() {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (!mounted) return;
-
-    if (error) {
-      console.log("Supabase session error:", error.message);
-      setAuthLoading(false);
-      return;
+      await applyProfileFromSession(data.session);
     }
 
-    await applyProfileFromSession(data.session);
-  }
+    loadSession();
 
-  loadSession();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      applyProfileFromSession(nextSession);
+    });
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-    applyProfileFromSession(nextSession);
-  });
-
-  return () => {
-    mounted = false;
-    subscription.unsubscribe();
-  };
-}, []);
-  async function loadSession() {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (!mounted) return;
-
-    if (error) {
-      console.log("Supabase session error:", error.message);
-      setAuthLoading(false);
-      return;
-    }
-
-    await applyProfileFromSession(data.session);
-  }
-
-  loadSession();
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-    applyProfileFromSession(nextSession);
-  });
-
-  return () => {
-    mounted = false;
-    subscription.unsubscribe();
-  };
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     setNicknameDraft(profile.nickname);
@@ -575,6 +548,7 @@ useEffect(() => {
       };
     }) {
       setOnlineRoomCode(payload.roomCode);
+      setRoomCode(payload.roomCode);
       setMyOnlineSide(payload.side);
       updateOnlineOpponentProfile(payload.state?.players, payload.side);
 
@@ -764,66 +738,114 @@ useEffect(() => {
     }
 
     setSession(null);
-    setProfile((prev) => ({
-      ...prev,
+    setProfile({
       nickname: "Guest",
       avatar: "G",
+      border: "neon",
+      level: 1,
+      exp: 0,
       followers: 0,
       following: 0,
-    }));
+      wins: 0,
+      losses: 0,
+    });
     setNicknameDraft("Guest");
+    setGems(120);
+    setCoins(3200);
   }
 
-async function changeProfileImageFromAlbum(
-  event: React.ChangeEvent<HTMLInputElement>
-) {
-  const file = event.target.files?.[0];
+  async function saveNickname() {
+    const nextNickname = nicknameDraft.trim().slice(0, 16);
 
-  if (!file) return;
+    if (!nextNickname) {
+      alert("닉네임을 입력해줘.");
+      return;
+    }
 
-  if (!file.type.startsWith("image/")) {
-    alert("이미지 파일만 선택할 수 있어.");
-    return;
-  }
+    setNicknameSaving(true);
 
-  setAvatarUploading(true);
+    setProfile((prev) => ({
+      ...prev,
+      nickname: nextNickname,
+      avatar:
+        prev.avatar.startsWith("http") || prev.avatar.startsWith("data:image/")
+          ? prev.avatar
+          : nextNickname.slice(0, 1).toUpperCase(),
+    }));
 
-  try {
     if (session) {
-      const publicUrl = await uploadProfileAvatar(session.user.id, file);
+      try {
+        await saveProfilePatch(session.user.id, {
+          nickname: nextNickname,
+          avatar_text: nextNickname.slice(0, 1).toUpperCase(),
+        });
 
-      setProfile((prev) => ({
-        ...prev,
-        avatar: publicUrl,
-      }));
+        await supabase.auth.updateUser({
+          data: {
+            display_name: nextNickname,
+            full_name: nextNickname,
+            name: nextNickname,
+          },
+        });
+      } catch (error) {
+        alert("닉네임 저장에 실패했어.");
+        console.log(error);
+      }
+    }
 
-      await saveProfilePatch(session.user.id, {
-        avatar_url: publicUrl,
-      });
-    } else {
-      const reader = new FileReader();
+    setNicknameSaving(false);
+  }
 
-      reader.onload = () => {
-        const imageUrl = String(reader.result);
+  async function changeProfileImageFromAlbum(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 선택할 수 있어.");
+      return;
+    }
+
+    setAvatarUploading(true);
+
+    try {
+      if (session) {
+        const publicUrl = await uploadProfileAvatar(session.user.id, file);
 
         setProfile((prev) => ({
           ...prev,
-          avatar: imageUrl,
+          avatar: publicUrl,
         }));
 
-        setAvatarUploading(false);
-      };
+        await saveProfilePatch(session.user.id, {
+          avatar_url: publicUrl,
+        });
+      } else {
+        const reader = new FileReader();
 
-      reader.readAsDataURL(file);
-      return;
+        reader.onload = () => {
+          const imageUrl = String(reader.result);
+
+          setProfile((prev) => ({
+            ...prev,
+            avatar: imageUrl,
+          }));
+
+          setAvatarUploading(false);
+        };
+
+        reader.readAsDataURL(file);
+        return;
+      }
+    } catch (error) {
+      alert("프로필 사진 저장에 실패했어.");
+      console.log(error);
     }
-  } catch (error) {
-    alert("프로필 사진 저장에 실패했어.");
-    console.log(error);
-  }
 
-  setAvatarUploading(false);
-}
+    setAvatarUploading(false);
+  }
 
   function completeMission(id: string) {
     setMissions((prev) =>
@@ -831,41 +853,41 @@ async function changeProfileImageFromAlbum(
     );
   }
 
-function claimMission(id: string) {
-  setMissions((prev) =>
-    prev.map((m) => {
-      if (m.id !== id || !m.done || m.claimed) return m;
+  function claimMission(id: string) {
+    setMissions((prev) =>
+      prev.map((m) => {
+        if (m.id !== id || !m.done || m.claimed) return m;
 
-      if (m.reward.includes("젬")) {
-        setGems((g) => {
-          const nextGems = g + 3;
+        if (m.reward.includes("젬")) {
+          setGems((g) => {
+            const nextGems = g + 3;
 
-          if (session) {
-            saveProfilePatch(session.user.id, {
-              gems: nextGems,
-            });
-          }
+            if (session) {
+              saveProfilePatch(session.user.id, {
+                gems: nextGems,
+              });
+            }
 
-          return nextGems;
-        });
-      } else {
-        setCoins((c) => {
-          const nextCoins = c + 100;
+            return nextGems;
+          });
+        } else {
+          setCoins((c) => {
+            const nextCoins = c + 100;
 
-          if (session) {
-            saveProfilePatch(session.user.id, {
-              coins: nextCoins,
-            });
-          }
+            if (session) {
+              saveProfilePatch(session.user.id, {
+                coins: nextCoins,
+              });
+            }
 
-          return nextCoins;
-        });
-      }
+            return nextCoins;
+          });
+        }
 
-      return { ...m, claimed: true };
-    })
-  );
-}
+        return { ...m, claimed: true };
+      })
+    );
+  }
 
   function getPointerAngle(clientX: number, clientY: number) {
     const rad = Math.atan2(
@@ -1137,36 +1159,38 @@ function claimMission(id: string) {
 
     setTimeout(() => setSkillActive(null), 6000);
   }
-async function saveProgressToCloud(next: {
-  level: number;
-  exp: number;
-  gems: number;
-  coins: number;
-  wins: number;
-  losses: number;
-}) {
-  if (!session) return;
 
-  setProfileSaving(true);
+  async function saveProgressToCloud(next: {
+    level: number;
+    exp: number;
+    gems: number;
+    coins: number;
+    wins: number;
+    losses: number;
+  }) {
+    if (!session) return;
 
-  try {
-    await saveProfilePatch(session.user.id, {
-      level: next.level,
-      exp: next.exp,
-      gems: next.gems,
-      coins: next.coins,
-      wins: next.wins,
-      losses: next.losses,
-      followers: profile.followers,
-      following: profile.following,
-      border: profile.border,
-    });
-  } catch (error) {
-    console.log("진행도 저장 실패:", error);
+    setProfileSaving(true);
+
+    try {
+      await saveProfilePatch(session.user.id, {
+        level: next.level,
+        exp: next.exp,
+        gems: next.gems,
+        coins: next.coins,
+        wins: next.wins,
+        losses: next.losses,
+        followers: profile.followers,
+        following: profile.following,
+        border: profile.border,
+      });
+    } catch (error) {
+      console.log("진행도 저장 실패:", error);
+    }
+
+    setProfileSaving(false);
   }
 
-  setProfileSaving(false);
-}
   function finishBattle(options?: {
     surrendered?: boolean;
     opponentSurrendered?: boolean;
@@ -1220,32 +1244,31 @@ async function saveProgressToCloud(next: {
 
     setResult(resultData);
 
-setProfile((prev) => {
-  const nextExp = prev.exp + exp;
-  const nextLevel = Math.floor(nextExp / 400) + 1;
-  const nextWins = victory === "VICTORY" ? prev.wins + 1 : prev.wins;
-  const nextLosses = victory === "DEFEAT" ? prev.losses + 1 : prev.losses;
-  const nextCoins = coins + rewardCoins;
+    setProfile((prev) => {
+      const nextExp = prev.exp + exp;
+      const nextLevel = Math.floor(nextExp / 400) + 1;
+      const nextWins = victory === "VICTORY" ? prev.wins + 1 : prev.wins;
+      const nextLosses = victory === "DEFEAT" ? prev.losses + 1 : prev.losses;
+      const nextCoins = coins + rewardCoins;
 
-  saveProgressToCloud({
-    level: nextLevel,
-    exp: nextExp,
-    gems,
-    coins: nextCoins,
-    wins: nextWins,
-    losses: nextLosses,
-  });
+      saveProgressToCloud({
+        level: nextLevel,
+        exp: nextExp,
+        gems,
+        coins: nextCoins,
+        wins: nextWins,
+        losses: nextLosses,
+      });
 
-  return {
-    ...prev,
-    exp: nextExp,
-    level: nextLevel,
-    wins: nextWins,
-    losses: nextLosses,
-  };
-});
+      return {
+        ...prev,
+        exp: nextExp,
+        level: nextLevel,
+        wins: nextWins,
+        losses: nextLosses,
+      };
+    });
 
-setCoins((prev) => prev + rewardCoins);
     setCoins((prev) => prev + rewardCoins);
     completeMission("daily5");
 
@@ -1318,6 +1341,7 @@ setCoins((prev) => prev + rewardCoins);
     };
 
     raf = requestAnimationFrame(loop);
+
     return () => cancelAnimationFrame(raf);
   }, [screen, battleStartedAt, battleMode, aiDifficulty, myScore, rivalScore]);
 
@@ -1341,14 +1365,22 @@ setCoins((prev) => prev + rewardCoins);
   }
 
   function followFriend(friendId: string) {
+    let shouldIncreaseFollowing = false;
+
     setFriends((prev) =>
-      prev.map((f) => (f.id === friendId ? { ...f, mutual: true } : f))
+      prev.map((f) => {
+        if (f.id !== friendId) return f;
+        if (!f.mutual) shouldIncreaseFollowing = true;
+        return { ...f, mutual: true };
+      })
     );
 
-    setProfile((prev) => ({
-      ...prev,
-      following: prev.following + 1,
-    }));
+    if (shouldIncreaseFollowing) {
+      setProfile((prev) => ({
+        ...prev,
+        following: prev.following + 1,
+      }));
+    }
   }
 
   function sendGift(friendId: string) {
@@ -1374,7 +1406,7 @@ setCoins((prev) => prev + rewardCoins);
           <div className="screen homeScreen">
             <button className="profileMini" onClick={() => setProfileOpen(true)}>
               <div className={`avatarFrame ${profile.border}`}>
-                <div className="avatar">{profile.avatar}</div>
+                <AvatarView value={profile.avatar} />
               </div>
               <div className="profileMiniText">
                 <strong>{profile.nickname}</strong>
@@ -1726,7 +1758,7 @@ setCoins((prev) => prev + rewardCoins);
             <div className="battleHeader">
               <div className="battleProfile">
                 <div className={`avatarFrame small ${profile.border}`}>
-                  <div className="avatar">{profile.avatar}</div>
+                  <AvatarView value={profile.avatar} />
                 </div>
                 <span>{profile.nickname}</span>
               </div>
@@ -1747,9 +1779,11 @@ setCoins((prev) => prev + rewardCoins);
                     battleMode === "ai" ? "purple" : onlineOpponentProfile.border
                   }`}
                 >
-                  <div className="avatar">
-                    {battleMode === "ai" ? "AI" : onlineOpponentProfile.avatar}
-                  </div>
+                  {battleMode === "ai" ? (
+                    <div className="avatar">AI</div>
+                  ) : (
+                    <AvatarView value={onlineOpponentProfile.avatar} />
+                  )}
                 </div>
               </div>
             </div>
@@ -1888,7 +1922,7 @@ setCoins((prev) => prev + rewardCoins);
 
             <div className="opponentFollowBox">
               <div className={`avatarFrame ${onlineOpponentProfile.border}`}>
-                <div className="avatar">{onlineOpponentProfile.avatar}</div>
+                <AvatarView value={onlineOpponentProfile.avatar} />
               </div>
               <div>
                 <strong>{onlineOpponentProfile.nickname}</strong>
@@ -1926,7 +1960,7 @@ setCoins((prev) => prev + rewardCoins);
           <Modal onClose={() => setProfileOpen(false)}>
             <div className="profileBigArea">
               <div className={`avatarFrame big ${profile.border}`}>
-                <div className="avatar">{profile.avatar}</div>
+                <AvatarView value={profile.avatar} />
               </div>
               <button
                 className="editProfileButton"
@@ -1944,7 +1978,6 @@ setCoins((prev) => prev + rewardCoins);
             <div className="nicknameEditBox">
               <label>닉네임 변경</label>
               <div>
-                {profileSaving && <p className="emptyText">계정 정보 저장 중...</p>}
                 <input
                   value={nicknameDraft}
                   maxLength={16}
@@ -1957,6 +1990,8 @@ setCoins((prev) => prev + rewardCoins);
               </div>
               <small>로그인 여부와 상관없이 변경할 수 있어.</small>
             </div>
+
+            {profileSaving && <p className="emptyText">계정 정보 저장 중...</p>}
 
             <div className="profileStats">
               <div>
@@ -1997,101 +2032,103 @@ setCoins((prev) => prev + rewardCoins);
         {profileEditOpen && (
           <Modal onClose={() => setProfileEditOpen(false)}>
             <h2>프로필 편집</h2>
-           <div className="tabRow">
-  <button
-    className={profileEditTab === "avatar" ? "active" : ""}
-    onClick={() => setProfileEditTab("avatar")}
-  >
-    기본
-  </button>
 
-  <button
-    className={profileEditTab === "album" ? "active" : ""}
-    onClick={() => setProfileEditTab("album")}
-  >
-    앨범
-  </button>
+            <div className="tabRow">
+              <button
+                className={profileEditTab === "avatar" ? "active" : ""}
+                onClick={() => setProfileEditTab("avatar")}
+              >
+                기본
+              </button>
 
-  <button
-    className={profileEditTab === "border" ? "active" : ""}
-    onClick={() => setProfileEditTab("border")}
-  >
-    테두리
-  </button>
-</div>
+              <button
+                className={profileEditTab === "album" ? "active" : ""}
+                onClick={() => setProfileEditTab("album")}
+              >
+                앨범
+              </button>
+
+              <button
+                className={profileEditTab === "border" ? "active" : ""}
+                onClick={() => setProfileEditTab("border")}
+              >
+                테두리
+              </button>
+            </div>
 
             {profileEditTab === "avatar" && (
-  <div className="avatarPickGrid">
-    {["G", "D", "R", "M", "J", "L", "K"].map((avatar) => (
-      <button
-        key={avatar}
-        onClick={() => {
-          setProfile((p) => ({
-            ...p,
-            avatar,
-          }));
+              <div className="avatarPickGrid">
+                {["G", "D", "R", "M", "J", "L", "K"].map((avatar) => (
+                  <button
+                    key={avatar}
+                    onClick={() => {
+                      setProfile((p) => ({
+                        ...p,
+                        avatar,
+                      }));
 
-          if (session) {
-            saveProfilePatch(session.user.id, {
-              avatar_text: avatar,
-              avatar_url: null,
-            });
-          }
-        }}
-      >
-        {avatar}
-      </button>
-    ))}
-  </div>
-)}
+                      if (session) {
+                        saveProfilePatch(session.user.id, {
+                          avatar_text: avatar,
+                          avatar_url: null,
+                        });
+                      }
+                    }}
+                  >
+                    {avatar}
+                  </button>
+                ))}
+              </div>
+            )}
 
-{profileEditTab === "album" && (
-  <div className="albumUploadBox">
-    <div className={`avatarFrame big ${profile.border}`}>
-      <AvatarView value={profile.avatar} />
-    </div>
+            {profileEditTab === "album" && (
+              <div className="albumUploadBox">
+                <div className={`avatarFrame big ${profile.border}`}>
+                  <AvatarView value={profile.avatar} />
+                </div>
 
-    <label className="albumUploadButton">
-      {avatarUploading ? "업로드 중..." : "앨범에서 사진 선택"}
-      <input
-        type="file"
-        accept="image/*"
-        disabled={avatarUploading}
-        onChange={changeProfileImageFromAlbum}
-      />
-    </label>
+                <label className="albumUploadButton">
+                  {avatarUploading ? "업로드 중..." : "앨범에서 사진 선택"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={avatarUploading}
+                    onChange={changeProfileImageFromAlbum}
+                  />
+                </label>
 
-    <p>
-      로그인 상태면 계정에 저장되고, 로그인 전에는 현재 화면에서만 적용돼.
-    </p>
-  </div>
-)}
+                <p>
+                  로그인 상태면 계정에 저장되고, 로그인 전에는 현재 화면에서만
+                  적용돼.
+                </p>
+              </div>
+            )}
 
-{profileEditTab === "border" && (
-  <div className="avatarPickGrid">
-    {["neon", "gold", "purple", "plain"].map((border) => (
-      <button
-        key={border}
-        onClick={() => {
-          const nextBorder = border as Profile["border"];
+            {profileEditTab === "border" && (
+              <div className="avatarPickGrid">
+                {["neon", "gold", "purple", "plain"].map((border) => (
+                  <button
+                    key={border}
+                    onClick={() => {
+                      const nextBorder = border as Profile["border"];
 
-          setProfile((p) => ({
-            ...p,
-            border: nextBorder,
-          }));
+                      setProfile((p) => ({
+                        ...p,
+                        border: nextBorder,
+                      }));
 
-          if (session) {
-            saveProfilePatch(session.user.id, {
-              border: nextBorder,
-            });
-          }
-        }}
-      >
-        {border}
-      </button>
-    ))}
-  </div>
-)}
+                      if (session) {
+                        saveProfilePatch(session.user.id, {
+                          border: nextBorder,
+                        });
+                      }
+                    }}
+                  >
+                    {border}
+                  </button>
+                ))}
+              </div>
+            )}
           </Modal>
         )}
 
@@ -2167,14 +2204,15 @@ setCoins((prev) => prev + rewardCoins);
               />
               <button
                 onClick={() => {
-                  if (!friendSearch.trim()) return;
+                  const nextName = friendSearch.trim();
+                  if (!nextName) return;
 
                   setFriends((prev) => [
                     ...prev,
                     {
                       id: Date.now().toString(),
-                      nickname: friendSearch.trim(),
-                      avatar: friendSearch.trim()[0].toUpperCase(),
+                      nickname: nextName,
+                      avatar: nextName[0].toUpperCase(),
                       mutual: false,
                       giftedToday: false,
                     },
@@ -2203,7 +2241,7 @@ setCoins((prev) => prev + rewardCoins);
                 .map((f) => (
                   <div key={f.id} className="friendItem">
                     <div className="avatarFrame small purple">
-                      <div className="avatar">{f.avatar}</div>
+                      <AvatarView value={f.avatar} />
                     </div>
                     <strong>{f.nickname}</strong>
                     <button disabled={f.giftedToday} onClick={() => sendGift(f.id)}>
@@ -2220,7 +2258,7 @@ setCoins((prev) => prev + rewardCoins);
                 .map((f) => (
                   <div key={f.id} className="friendItem">
                     <div className="avatarFrame small">
-                      <div className="avatar">{f.avatar}</div>
+                      <AvatarView value={f.avatar} />
                     </div>
                     <strong>{f.nickname}</strong>
                     <button onClick={() => followFriend(f.id)}>맞팔 처리</button>
@@ -2239,7 +2277,7 @@ setCoins((prev) => prev + rewardCoins);
               {mails.map((m) => (
                 <div key={m.id} className="mailItem">
                   <div className="avatarFrame small purple">
-                    <div className="avatar">{m.avatar}</div>
+                    <AvatarView value={m.avatar} />
                   </div>
                   <div>
                     <strong>{m.from}</strong>
@@ -2257,6 +2295,7 @@ setCoins((prev) => prev + rewardCoins);
     </main>
   );
 }
+
 function AvatarView({ value }: { value: string }) {
   if (value.startsWith("http") || value.startsWith("data:image/")) {
     return <img className="avatarImage" src={value} alt="profile" />;
@@ -2264,12 +2303,13 @@ function AvatarView({ value }: { value: string }) {
 
   return <div className="avatar">{value}</div>;
 }
+
 function Modal({
   children,
   onClose,
   className = "",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClose: () => void;
   className?: string;
 }) {
@@ -2459,7 +2499,7 @@ function LobbyScreen({
         <div className="vsMark">VS</div>
         <div className="lobbyProfileCard">
           <div className={`avatarFrame ${opponentBorder}`}>
-            <div className="avatar">{opponentAvatar}</div>
+            <AvatarView value={opponentAvatar} />
           </div>
           <strong>{opponentName}</strong>
           <span>Lv.{opponentLevel}</span>
