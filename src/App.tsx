@@ -1974,57 +1974,101 @@ setCoins((prev) => prev + rewardCoins);
         {profileEditOpen && (
           <Modal onClose={() => setProfileEditOpen(false)}>
             <h2>프로필 편집</h2>
-            <div className="tabRow">
-              <button
-                className={profileEditTab === "avatar" ? "active" : ""}
-                onClick={() => setProfileEditTab("avatar")}
-              >
-                사진
-              </button>
-              <button
-                className={profileEditTab === "border" ? "active" : ""}
-                onClick={() => setProfileEditTab("border")}
-              >
-                테두리
-              </button>
-            </div>
+           <div className="tabRow">
+  <button
+    className={profileEditTab === "avatar" ? "active" : ""}
+    onClick={() => setProfileEditTab("avatar")}
+  >
+    기본
+  </button>
 
-            {profileEditTab === "avatar" ? (
-              <div className="avatarPickGrid">
-                {["G", "D", "R", "M", "J", "L", "K"].map((avatar) => (
-                  <button
-                    key={avatar}
-                    onClick={() => setProfile((p) => ({ ...p, avatar }))}
-                  >
-                    {avatar}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="avatarPickGrid">
-                {["neon", "gold", "purple", "plain"].map((border) => (
-                  <button
-                    key={border}
-                    onClick={() => {
-  const nextBorder = border as Profile["border"];
+  <button
+    className={profileEditTab === "album" ? "active" : ""}
+    onClick={() => setProfileEditTab("album")}
+  >
+    앨범
+  </button>
 
-  setProfile((p) => ({
-    ...p,
-    border: nextBorder,
-  }));
+  <button
+    className={profileEditTab === "border" ? "active" : ""}
+    onClick={() => setProfileEditTab("border")}
+  >
+    테두리
+  </button>
+</div>
 
-  if (session) {
-    saveProfilePatch(session.user.id, {
-      border: nextBorder,
-    });
-  }
-}}
-                  >
-                    {border}
-                  </button>
-                ))}
-              </div>
-            )}
+            {profileEditTab === "avatar" && (
+  <div className="avatarPickGrid">
+    {["G", "D", "R", "M", "J", "L", "K"].map((avatar) => (
+      <button
+        key={avatar}
+        onClick={() => {
+          setProfile((p) => ({
+            ...p,
+            avatar,
+          }));
+
+          if (session) {
+            saveProfilePatch(session.user.id, {
+              avatar_text: avatar,
+              avatar_url: null,
+            });
+          }
+        }}
+      >
+        {avatar}
+      </button>
+    ))}
+  </div>
+)}
+
+{profileEditTab === "album" && (
+  <div className="albumUploadBox">
+    <div className={`avatarFrame big ${profile.border}`}>
+      <AvatarView value={profile.avatar} />
+    </div>
+
+    <label className="albumUploadButton">
+      {avatarUploading ? "업로드 중..." : "앨범에서 사진 선택"}
+      <input
+        type="file"
+        accept="image/*"
+        disabled={avatarUploading}
+        onChange={changeProfileImageFromAlbum}
+      />
+    </label>
+
+    <p>
+      로그인 상태면 계정에 저장되고, 로그인 전에는 현재 화면에서만 적용돼.
+    </p>
+  </div>
+)}
+
+{profileEditTab === "border" && (
+  <div className="avatarPickGrid">
+    {["neon", "gold", "purple", "plain"].map((border) => (
+      <button
+        key={border}
+        onClick={() => {
+          const nextBorder = border as Profile["border"];
+
+          setProfile((p) => ({
+            ...p,
+            border: nextBorder,
+          }));
+
+          if (session) {
+            saveProfilePatch(session.user.id, {
+              border: nextBorder,
+            });
+          }
+        }}
+      >
+        {border}
+      </button>
+    ))}
+  </div>
+)}
           </Modal>
         )}
 
