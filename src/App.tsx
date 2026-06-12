@@ -10,8 +10,7 @@ import type { Session } from "@supabase/supabase-js";
 import "./App.css";
 import { socket } from "./socket";
 import { supabase } from "./supabaseClient";
-import { socket } from "./socket";
-import { supabase } from "./supabaseClient";
+
 
 type Screen =
   | "home"
@@ -418,76 +417,60 @@ const [avatarUploading, setAvatarUploading] = useState(false);
     let mounted = true;
 
     async function loadSession() {
-      const { data, error } = await supabase.auth.getSession();
+useEffect(() => {
+  let mounted = true;
+
+  async function applyProfileFromSession(nextSession: Session | null) {
+    setSession(nextSession);
+    setAuthLoading(false);
+
+    const user = nextSession?.user;
+
+    if (!user) return;
+
+    try {
+      const dbProfile = await loadOrCreateProfile(user.id, user.email);
 
       if (!mounted) return;
 
-      if (error) {
-        console.log("Supabase session error:", error.message);
-        setAuthLoading(false);
-        return;
-      }
+      const localProfile = dbProfileToLocalProfile(dbProfile);
 
-      setSession(data.session);
+      setProfile(localProfile);
+      setNicknameDraft(localProfile.nickname);
+      setGems(dbProfile.gems);
+      setCoins(dbProfile.coins);
+    } catch (error) {
+      console.log("프로필 불러오기 실패:", error);
+    }
+  }
+
+  async function loadSession() {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    if (error) {
+      console.log("Supabase session error:", error.message);
       setAuthLoading(false);
-
-      const user = data.session?.user;
-
-      if (user) {
-        const displayName =
-          user.user_metadata?.display_name ||
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email ||
-          "Riser";
-
-        const nextName = String(displayName).slice(0, 16);
-
-        setProfile((prev) => ({
-          ...prev,
-          nickname: nextName,
-          avatar: nextName.slice(0, 1).toUpperCase(),
-        }));
-
-        setNicknameDraft(nextName);
-      }
+      return;
     }
 
-    loadSession();
+    await applyProfileFromSession(data.session);
+  }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setAuthLoading(false);
+  loadSession();
 
-      const user = nextSession?.user;
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    applyProfileFromSession(nextSession);
+  });
 
-      if (user) {
-        const displayName =
-          user.user_metadata?.display_name ||
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email ||
-          "Riser";
-
-        const nextName = String(displayName).slice(0, 16);
-
-        setProfile((prev) => ({
-          ...prev,
-          nickname: nextName,
-          avatar: nextName.slice(0, 1).toUpperCase(),
-        }));
-
-        setNicknameDraft(nextName);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
 
   useEffect(() => {
     setNicknameDraft(profile.nickname);
@@ -769,14 +752,9 @@ const [avatarUploading, setAvatarUploading] = useState(false);
     setNicknameDraft("Guest");
   }
 
-  async function saveNickname() {
-    const nextNickname = nicknameDraft.trim().slice(0, 16);
-
-    if (!nextNickname) {
-      alert("닉네임을 입력해줘.");
-      return;
-    }
-function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>) {
+async function changeProfileImageFromAlbum(
+  event: React.ChangeEvent<HTMLInputElement>
+) {
   const file = event.target.files?.[0];
 
   if (!file) return;
@@ -786,43 +764,44 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
     return;
   }
 
-  const reader = new FileReader();
+  setAvatarUploading(true);
 
-  reader.onload = () => {
-    const imageUrl = String(reader.result);
-
-    setProfile((prev) => ({
-      ...prev,
-      avatar: imageUrl,
-    }));
-  };
-
-  reader.readAsDataURL(file);
-}
-    setNicknameSaving(true);
-
-    setProfile((prev) => ({
-      ...prev,
-      nickname: nextNickname,
-      avatar: nextNickname.slice(0, 1).toUpperCase(),
-    }));
-
+  try {
     if (session) {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          display_name: nextNickname,
-          full_name: nextNickname,
-          name: nextNickname,
-        },
+      const publicUrl = await uploadProfileAvatar(session.user.id, file);
+
+      setProfile((prev) => ({
+        ...prev,
+        avatar: publicUrl,
+      }));
+
+      await saveProfilePatch(session.user.id, {
+        avatar_url: publicUrl,
       });
+    } else {
+      const reader = new FileReader();
 
-      if (error) {
-        alert(`닉네임 저장 실패: ${error.message}`);
-      }
+      reader.onload = () => {
+        const imageUrl = String(reader.result);
+
+        setProfile((prev) => ({
+          ...prev,
+          avatar: imageUrl,
+        }));
+
+        setAvatarUploading(false);
+      };
+
+      reader.readAsDataURL(file);
+      return;
     }
-
-    setNicknameSaving(false);
+  } catch (error) {
+    alert("프로필 사진 저장에 실패했어.");
+    console.log(error);
   }
+
+  setAvatarUploading(false);
+}
 
   function completeMission(id: string) {
     setMissions((prev) =>
@@ -830,21 +809,41 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
     );
   }
 
-  function claimMission(id: string) {
-    setMissions((prev) =>
-      prev.map((m) => {
-        if (m.id !== id || !m.done || m.claimed) return m;
+function claimMission(id: string) {
+  setMissions((prev) =>
+    prev.map((m) => {
+      if (m.id !== id || !m.done || m.claimed) return m;
 
-        if (m.reward.includes("젬")) {
-          setGems((g) => g + 3);
-        } else {
-          setCoins((c) => c + 100);
-        }
+      if (m.reward.includes("젬")) {
+        setGems((g) => {
+          const nextGems = g + 3;
 
-        return { ...m, claimed: true };
-      })
-    );
-  }
+          if (session) {
+            saveProfilePatch(session.user.id, {
+              gems: nextGems,
+            });
+          }
+
+          return nextGems;
+        });
+      } else {
+        setCoins((c) => {
+          const nextCoins = c + 100;
+
+          if (session) {
+            saveProfilePatch(session.user.id, {
+              coins: nextCoins,
+            });
+          }
+
+          return nextCoins;
+        });
+      }
+
+      return { ...m, claimed: true };
+    })
+  );
+}
 
   function getPointerAngle(clientX: number, clientY: number) {
     const rad = Math.atan2(
@@ -1116,7 +1115,36 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
 
     setTimeout(() => setSkillActive(null), 6000);
   }
+async function saveProgressToCloud(next: {
+  level: number;
+  exp: number;
+  gems: number;
+  coins: number;
+  wins: number;
+  losses: number;
+}) {
+  if (!session) return;
 
+  setProfileSaving(true);
+
+  try {
+    await saveProfilePatch(session.user.id, {
+      level: next.level,
+      exp: next.exp,
+      gems: next.gems,
+      coins: next.coins,
+      wins: next.wins,
+      losses: next.losses,
+      followers: profile.followers,
+      following: profile.following,
+      border: profile.border,
+    });
+  } catch (error) {
+    console.log("진행도 저장 실패:", error);
+  }
+
+  setProfileSaving(false);
+}
   function finishBattle(options?: {
     surrendered?: boolean;
     opponentSurrendered?: boolean;
@@ -1170,18 +1198,32 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
 
     setResult(resultData);
 
-    setProfile((prev) => {
-      const nextExp = prev.exp + exp;
+setProfile((prev) => {
+  const nextExp = prev.exp + exp;
+  const nextLevel = Math.floor(nextExp / 400) + 1;
+  const nextWins = victory === "VICTORY" ? prev.wins + 1 : prev.wins;
+  const nextLosses = victory === "DEFEAT" ? prev.losses + 1 : prev.losses;
+  const nextCoins = coins + rewardCoins;
 
-      return {
-        ...prev,
-        exp: nextExp,
-        level: Math.floor(nextExp / 400) + 1,
-        wins: victory === "VICTORY" ? prev.wins + 1 : prev.wins,
-        losses: victory === "DEFEAT" ? prev.losses + 1 : prev.losses,
-      };
-    });
+  saveProgressToCloud({
+    level: nextLevel,
+    exp: nextExp,
+    gems,
+    coins: nextCoins,
+    wins: nextWins,
+    losses: nextLosses,
+  });
 
+  return {
+    ...prev,
+    exp: nextExp,
+    level: nextLevel,
+    wins: nextWins,
+    losses: nextLosses,
+  };
+});
+
+setCoins((prev) => prev + rewardCoins);
     setCoins((prev) => prev + rewardCoins);
     completeMission("daily5");
 
@@ -1963,12 +2005,20 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
                 {["neon", "gold", "purple", "plain"].map((border) => (
                   <button
                     key={border}
-                    onClick={() =>
-                      setProfile((p) => ({
-                        ...p,
-                        border: border as Profile["border"],
-                      }))
-                    }
+                    onClick={() => {
+  const nextBorder = border as Profile["border"];
+
+  setProfile((p) => ({
+    ...p,
+    border: nextBorder,
+  }));
+
+  if (session) {
+    saveProfilePatch(session.user.id, {
+      border: nextBorder,
+    });
+  }
+}}
                   >
                     {border}
                   </button>
@@ -2140,7 +2190,13 @@ function changeProfileImageFromAlbum(event: React.ChangeEvent<HTMLInputElement>)
     </main>
   );
 }
+function AvatarView({ value }: { value: string }) {
+  if (value.startsWith("http") || value.startsWith("data:image/")) {
+    return <img className="avatarImage" src={value} alt="profile" />;
+  }
 
+  return <div className="avatar">{value}</div>;
+}
 function Modal({
   children,
   onClose,
@@ -2169,7 +2225,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
   return (
     <div className="lobbyProfileCard">
       <div className={`avatarFrame ${profile.border}`}>
-        <div className="avatar">{profile.avatar}</div>
+        <AvatarView value={profile.avatar} />
       </div>
       <strong>{profile.nickname}</strong>
       <span>Lv.{profile.level}</span>
