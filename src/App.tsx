@@ -1922,6 +1922,7 @@ setCoins((prev) => prev + rewardCoins);
             <div className="nicknameEditBox">
               <label>닉네임 변경</label>
               <div>
+                {profileSaving && <p className="emptyText">계정 정보 저장 중...</p>}
                 <input
                   value={nicknameDraft}
                   maxLength={16}
