@@ -286,9 +286,9 @@ const [avatarUploading, setAvatarUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
- const [profileEditTab, setProfileEditTab] = useState<"avatar" | "album" | "border">(
-  "avatar"
-);
+const [profileEditTab, setProfileEditTab] = useState<
+  "avatar" | "album" | "border"
+>("avatar");
   const [missionOpen, setMissionOpen] = useState(false);
   const [friendOpen, setFriendOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
