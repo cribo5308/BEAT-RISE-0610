@@ -10,6 +10,8 @@ import {
   saveProfilePatch,
   uploadProfileAvatar,
 } from "./profileStore";
+import { MUSIC_TRACKS } from "./musicData";
+import type { BeatRiseNoteType } from "./musicData";
 
 type Screen =
   | "home"
@@ -45,6 +47,24 @@ type MusicTrack = {
   title: string;
   bpm: number;
   difficulty: "EASY" | "NORMAL" | "HARD" | "EXPERT";
+  audioSrc: string;
+  startOffset: number;
+  duration: number;
+  beatNotes: {
+    time: number;
+    lane: 0 | 1 | 2 | 3;
+    type: BeatRiseNoteType;
+  }[];
+  melodyNotes: {
+    time: number;
+    lane: 0 | 1 | 2 | 3;
+    type: BeatRiseNoteType;
+  }[];
+  chart: {
+    time: number;
+    lane: 0 | 1 | 2 | 3;
+    type: BeatRiseNoteType;
+  }[];
 };
 
 type Profile = {
@@ -61,8 +81,9 @@ type Profile = {
 
 type Note = {
   id: number;
-  lane: number;
+  lane: 0 | 1 | 2 | 3;
   time: number;
+  type: BeatRiseNoteType;
   hit: boolean;
   missed: boolean;
 };
@@ -110,7 +131,6 @@ type Mission = {
 const PHONE_RATIO = "9 / 19.5";
 
 const MAX_SELECTED_CHARACTERS = 2;
-const BATTLE_DURATION = 60;
 const NOTE_FALL_TIME = 2.25;
 const NOTE_START_TOP = -10;
 const NOTE_JUDGE_TOP = 82;
@@ -173,12 +193,7 @@ const characters: Character[] = [
   },
 ];
 
-const musicTracks: MusicTrack[] = [
-  { id: "street", title: "Street Break", bpm: 94, difficulty: "NORMAL" },
-  { id: "rush", title: "Rush Floor", bpm: 112, difficulty: "HARD" },
-  { id: "wave", title: "Purple Wave", bpm: 102, difficulty: "NORMAL" },
-  { id: "neon", title: "Neon Battle", bpm: 128, difficulty: "EXPERT" },
-];
+const musicTracks = MUSIC_TRACKS as MusicTrack[];
 
 const tutorialPages = [
   {
@@ -222,27 +237,6 @@ function getWinRate(wins: number, losses: number) {
   const total = wins + losses;
   if (total <= 0) return 0;
   return Math.round((wins / total) * 100);
-}
-
-function generateNotes(seed: number) {
-  const output: Note[] = [];
-  let time = 1.15;
-  let id = 1;
-
-  while (time < BATTLE_DURATION - 0.7) {
-    output.push({
-      id,
-      lane: (Math.floor(time * 100) + seed + id * 11) % 4,
-      time: Number(time.toFixed(3)),
-      hit: false,
-      missed: false,
-    });
-
-    id += 1;
-    time += 0.52 + ((id + seed) % 4) * 0.05;
-  }
-
-  return output;
 }
 
 export default function App() {
@@ -305,6 +299,7 @@ export default function App() {
 
   const turntableRef = useRef<HTMLDivElement | null>(null);
   const battleFinishedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const dragRef = useRef({
     dragging: false,
@@ -683,7 +678,7 @@ export default function App() {
       socket.off("attackSuccess", handleAttackSuccess);
       socket.off("battleEnded", handleBattleEnded);
     };
-  }, [myOnlineSide, screen, myScore, rivalScore]);
+  }, [myOnlineSide, screen]);
 
   function updateOnlineOpponentProfile(
     players:
@@ -1030,12 +1025,17 @@ export default function App() {
   function startBattle(mode: BattleMode, onlineSeed?: number) {
     battleFinishedRef.current = false;
 
-    const seed =
-      onlineSeed ??
-      selectedMusic.bpm + selectedCharacters.length * 17 + mode.length;
+    const chartNotes: Note[] = selectedMusic.chart.map((note, index) => ({
+      id: index + 1,
+      lane: note.lane,
+      time: note.time,
+      type: note.type,
+      hit: false,
+      missed: false,
+    }));
 
     setBattleMode(mode);
-    setNotes(generateNotes(seed));
+    setNotes(chartNotes);
     setBattleStartedAt(performance.now());
     setBattleElapsed(0);
     setMyScore(0);
@@ -1053,6 +1053,21 @@ export default function App() {
     setResult(null);
     setScreen("battle");
     completeMission("daily1");
+
+    const audio = audioRef.current;
+
+    if (audio) {
+      audio.pause();
+      audio.src = selectedMusic.audioSrc;
+      audio.currentTime = selectedMusic.startOffset;
+      audio.volume = sound / 100;
+
+      audio.play().catch((error) => {
+        console.log("음악 재생 실패:", error);
+      });
+    }
+
+    console.log("onlineSeed:", onlineSeed);
   }
 
   function syncOnlineScore(nextScore: number) {
@@ -1199,6 +1214,8 @@ export default function App() {
     if (battleFinishedRef.current) return;
     battleFinishedRef.current = true;
 
+    audioRef.current?.pause();
+
     const surrendered = options?.surrendered ?? false;
     const opponentSurrendered = options?.opponentSurrendered ?? false;
     const notifyServer = options?.notifyServer ?? true;
@@ -1303,7 +1320,15 @@ export default function App() {
     let raf = 0;
 
     const loop = (time: number) => {
-      const elapsed = clamp((time - battleStartedAt) / 1000, 0, BATTLE_DURATION);
+      const audio = audioRef.current;
+
+      const audioElapsed =
+        audio && !audio.paused
+          ? audio.currentTime - selectedMusic.startOffset
+          : (time - battleStartedAt) / 1000;
+
+      const elapsed = clamp(audioElapsed, 0, selectedMusic.duration);
+
       setBattleElapsed(elapsed);
 
       if (battleMode === "ai") {
@@ -1330,7 +1355,7 @@ export default function App() {
         })
       );
 
-      if (elapsed >= BATTLE_DURATION) {
+      if (elapsed >= selectedMusic.duration) {
         finishBattle({
           notifyServer: true,
         });
@@ -1343,7 +1368,7 @@ export default function App() {
     raf = requestAnimationFrame(loop);
 
     return () => cancelAnimationFrame(raf);
-  }, [screen, battleStartedAt, battleMode, aiDifficulty, myScore, rivalScore]);
+  }, [screen, battleStartedAt, battleMode, aiDifficulty, selectedMusic]);
 
   function getNoteStyle(note: Note) {
     const progress = 1 - (note.time - battleElapsed) / NOTE_FALL_TIME;
@@ -1402,6 +1427,8 @@ export default function App() {
   return (
     <main className="app" style={{ ["--phone-ratio" as string]: PHONE_RATIO }}>
       <section className="phone">
+        <audio ref={audioRef} preload="auto" />
+
         {screen === "home" && (
           <div className="screen homeScreen">
             <button className="profileMini" onClick={() => setProfileOpen(true)}>
@@ -1767,7 +1794,9 @@ export default function App() {
                 <strong>
                   {myScore} : {rivalScore}
                 </strong>
-                <span>{Math.max(0, BATTLE_DURATION - battleElapsed).toFixed(1)}s</span>
+                <span>
+                  {Math.max(0, selectedMusic.duration - battleElapsed).toFixed(1)}s
+                </span>
               </div>
 
               <div className="battleProfile right">
@@ -1819,7 +1848,9 @@ export default function App() {
                   .map((note) => (
                     <div
                       key={note.id}
-                      className="battleNote"
+                      className={`battleNote ${
+                        note.type === "melody" ? "melodyNote" : "beatNote"
+                      }`}
                       style={getNoteStyle(note)}
                     />
                   ))}
@@ -2357,7 +2388,7 @@ function MusicSelector({
         <button className="musicToggle" onClick={() => setMusicOpen(!musicOpen)}>
           <strong>{selectedMusic.title}</strong>
           <span>
-            BPM {selectedMusic.bpm} · {selectedMusic.difficulty}
+            BPM {Math.round(selectedMusic.bpm)} · {selectedMusic.difficulty}
           </span>
         </button>
         <button onClick={() => setSelectedMusic(getRandomMusic())}>랜덤</button>
@@ -2376,7 +2407,7 @@ function MusicSelector({
             >
               <strong>{track.title}</strong>
               <span>
-                BPM {track.bpm} · {track.difficulty}
+                BPM {Math.round(track.bpm)} · {track.difficulty}
               </span>
             </button>
           ))}
