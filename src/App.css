@@ -1908,3 +1908,135 @@ p {
   font-size: 12px;
   line-height: 1.4;
 }
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
+}
+
+.surrenderButton {
+  position: absolute;
+  top: 92px;
+  right: 18px;
+  z-index: 60;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: rgba(255, 75, 92, 0.18);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 1000;
+  border: 1px solid rgba(255, 120, 140, 0.34);
+  box-shadow: 0 0 16px rgba(255, 75, 92, 0.16);
+}
+
+.surrenderButton:active {
+  transform: scale(0.96);
+  background: rgba(255, 75, 92, 0.32);
+}
+
+.resultReason {
+  margin: -4px 0 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.nicknameEditBox {
+  margin: 16px 0;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(143, 247, 255, 0.14);
+}
+
+.nicknameEditBox label {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nicknameEditBox div {
+  display: flex;
+  gap: 8px;
+}
+
+.nicknameEditBox input {
+  flex: 1;
+  height: 42px;
+  border: 0;
+  outline: none;
+  border-radius: 14px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.11);
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.nicknameEditBox button {
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: linear-gradient(135deg, #8ff7ff, #ff4bd8);
+  color: #111;
+  font-weight: 1000;
+}
+
+.nicknameEditBox small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.emptyText {
+  margin: 14px 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+
+.albumUploadBox {
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(143, 247, 255, 0.14);
+}
+
+.albumUploadButton {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8ff7ff, #ff4bd8);
+  color: #111;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.albumUploadButton input {
+  display: none;
+}
+
+.albumUploadButton:has(input:disabled) {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.albumUploadBox p {
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  line-height: 1.4;
+}
