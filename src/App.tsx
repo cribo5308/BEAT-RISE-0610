@@ -493,7 +493,6 @@ useEffect(() => {
     mounted = false;
     subscription.unsubscribe();
   };
-}, []);
 
   useEffect(() => {
     setNicknameDraft(profile.nickname);
@@ -2520,4 +2519,4 @@ function Placeholder({
       <p>{desc}</p>
     </div>
   );
-}
+
