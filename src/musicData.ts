@@ -9,11 +9,11 @@ export type BeatRiseChartNote = {
 const beatLanePattern = [1, 2, 1, 3, 0, 2, 1, 2] as const;
 const melodyLanePattern = [3, 2, 0, 1, 3, 0, 2, 1, 3, 2, 1, 0] as const;
 
-// 원본 파일 기준 30초부터 1분 30초까지 사용하는 차트.
-// 게임 안에서는 time 0이 원곡 30초 지점이야.
+// 원곡 기준 30초 ~ 1분 30초 사용
+// 게임에서는 time 0 = 원곡 30초 지점
 export const FUTURE_BASS_START_OFFSET = 30;
 export const FUTURE_BASS_DURATION = 60;
-export const FUTURE_BASS_BPM = 151.999;
+export const FUTURE_BASS_BPM = 152;
 
 export const futureBassBeatTimes = [
   0.464, 0.882, 1.277, 1.672, 2.09, 2.485, 2.879, 3.274, 3.669, 4.087,
@@ -55,13 +55,12 @@ export const futureBassBeatNotes: BeatRiseChartNote[] = futureBassBeatTimes.map(
   })
 );
 
-export const futureBassMelodyNotes: BeatRiseChartNote[] = futureBassMelodyTimes.map(
-  (time, index) => ({
+export const futureBassMelodyNotes: BeatRiseChartNote[] =
+  futureBassMelodyTimes.map((time, index) => ({
     time,
     lane: melodyLanePattern[index % melodyLanePattern.length],
     type: "melody",
-  })
-);
+  }));
 
 export const futureBassChart: BeatRiseChartNote[] = [
   ...futureBassBeatNotes,
