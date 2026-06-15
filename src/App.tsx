@@ -678,7 +678,7 @@ export default function App() {
       socket.off("attackSuccess", handleAttackSuccess);
       socket.off("battleEnded", handleBattleEnded);
     };
-  }, [myOnlineSide, screen]);
+  }, [myOnlineSide, screen, selectedMusic]);
 
   function updateOnlineOpponentProfile(
     players:
@@ -2328,7 +2328,11 @@ export default function App() {
 }
 
 function AvatarView({ value }: { value: string }) {
-  if (value.startsWith("http") || value.startsWith("data:image/")) {
+  if (
+    value.startsWith("http") ||
+    value.startsWith("data:image/") ||
+    value.startsWith("/")
+  ) {
     return <img className="avatarImage" src={value} alt="profile" />;
   }
 
