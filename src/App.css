@@ -2076,3 +2076,21 @@ p {
   content: "  ♪";
   opacity: 0.7;
 }
+.beatNote {
+  background: linear-gradient(135deg, #8ff7ff, #2af3ff);
+  box-shadow:
+    0 0 16px rgba(143, 247, 255, 0.75),
+    0 0 34px rgba(42, 243, 255, 0.28);
+}
+
+.melodyNote {
+  background: linear-gradient(135deg, #ff4bd8, #ffd36a);
+  box-shadow:
+    0 0 16px rgba(255, 75, 216, 0.75),
+    0 0 34px rgba(255, 211, 106, 0.28);
+}
+
+.musicToggle strong::after {
+  content: "  ♪";
+  opacity: 0.7;
+}
