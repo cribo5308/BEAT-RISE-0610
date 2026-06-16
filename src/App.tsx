@@ -330,24 +330,40 @@ export default function App() {
   const [myScore, setMyScore] = useState(0);
   const [rivalScore, setRivalScore] = useState(0);
   const [combo, setCombo] = useState(0);
-  const myScoreRef = useRef(0);
-  const rivalScoreRef = useRef(0);
-  const [, setMaxCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
   const [fever, setFever] = useState(0);
   const [pressedLane, setPressedLane] = useState<number | null>(null);
   const [judge, setJudge] = useState<Judge>("");
   const [attackSuccess, setAttackSuccess] = useState(false);
   const [skillActive, setSkillActive] = useState<string | null>(null);
 
-  const [perfectCount, setPerfectCount] = useState(0);
-  const [, setGreatCount] = useState(0);
-  const [, setGoodCount] = useState(0);
-  const [, setMissCount] = useState(0);
+  const myScoreRef = useRef(0);
+  const rivalScoreRef = useRef(0);
   const perfectCountRef = useRef(0);
   const greatCountRef = useRef(0);
   const goodCountRef = useRef(0);
   const missCountRef = useRef(0);
   const maxComboRef = useRef(0);
+
+  const lunaGuardRef = useRef(false);
+  const kaiBoostRef = useRef(false);
+  const tauntMissRef = useRef(false);
+  const laneReversedRef = useRef(false);
+  const aiScoreMultiplierRef = useRef(1);
+  const aiNextSkillAtRef = useRef(0);
+  const aiSkillIndexRef = useRef(0);
+
+  const [waterBlock, setWaterBlock] = useState(false);
+  const [tauntMiss, setTauntMiss] = useState(false);
+  const [laneReversed, setLaneReversed] = useState(false);
+  const [lunaGuard, setLunaGuard] = useState(false);
+  const [kaiBoost, setKaiBoost] = useState(false);
+  const [aiSkillNotice, setAiSkillNotice] = useState<string | null>(null);
+
+  const [perfectCount, setPerfectCount] = useState(0);
+  const [greatCount, setGreatCount] = useState(0);
+  const [goodCount, setGoodCount] = useState(0);
+  const [missCount, setMissCount] = useState(0);
 
   const [result, setResult] = useState<ResultData | null>(null);
 
@@ -413,6 +429,16 @@ export default function App() {
   const missionNotice = missions.some((m) => m.done && !m.claimed);
   const mailNotice = mails.some((m) => !m.claimed);
   const friendNotice = friends.some((f) => !f.mutual);
+
+  useEffect(() => {
+    myScoreRef.current = myScore;
+    rivalScoreRef.current = rivalScore;
+    perfectCountRef.current = perfectCount;
+    greatCountRef.current = greatCount;
+    goodCountRef.current = goodCount;
+    missCountRef.current = missCount;
+    maxComboRef.current = maxCombo;
+  }, [myScore, rivalScore, perfectCount, greatCount, goodCount, missCount, maxCombo]);
 
   useEffect(() => {
     let mounted = true;
@@ -606,10 +632,9 @@ export default function App() {
       if (!payload.scores || !myOnlineSide) return;
 
       const rivalSide = myOnlineSide === "A" ? "B" : "A";
-const nextRivalScore = payload.scores[rivalSide];
-
-rivalScoreRef.current = nextRivalScore;
-setRivalScore(nextRivalScore);
+      const nextRivalScore = payload.scores[rivalSide];
+      rivalScoreRef.current = nextRivalScore;
+      setRivalScore(nextRivalScore);
     }
 
     function handleScoreSync(payload: {
@@ -625,14 +650,14 @@ setRivalScore(nextRivalScore);
       const rivalSide = myOnlineSide === "A" ? "B" : "A";
 
       if (payload.side === rivalSide) {
-  rivalScoreRef.current = payload.score;
-  setRivalScore(payload.score);
-  return;
-}
+        rivalScoreRef.current = payload.score;
+        setRivalScore(payload.score);
+        return;
+      }
 
-const nextRivalScore = payload.scores[rivalSide];
-rivalScoreRef.current = nextRivalScore;
-setRivalScore(nextRivalScore);
+      const nextRivalScore = payload.scores[rivalSide];
+      rivalScoreRef.current = nextRivalScore;
+      setRivalScore(nextRivalScore);
     }
 
     function handleAttackSuccess(payload: {
@@ -658,12 +683,11 @@ setRivalScore(nextRivalScore);
       if (screen !== "battle") return;
 
       if (payload.scores && myOnlineSide) {
-  const rivalSide = myOnlineSide === "A" ? "B" : "A";
-  const nextRivalScore = payload.scores[rivalSide];
-
-  rivalScoreRef.current = nextRivalScore;
-  setRivalScore(nextRivalScore);
-}
+        const rivalSide = myOnlineSide === "A" ? "B" : "A";
+        const nextRivalScore = payload.scores[rivalSide];
+        rivalScoreRef.current = nextRivalScore;
+        setRivalScore(nextRivalScore);
+      }
 
       if (payload.reason === "surrender" && payload.surrenderSide) {
         if (payload.surrenderSide !== myOnlineSide) {
@@ -1076,23 +1100,37 @@ async function signInWithKakao() {
     setRivalScore(0);
     setCombo(0);
     setMaxCombo(0);
-    myScoreRef.current = 0;
-    rivalScoreRef.current = 0;
     setFever(0);
     setJudge("");
     setAttackSuccess(false);
     setSkillActive(null);
     setPerfectCount(0);
-setGreatCount(0);
-setGoodCount(0);
-setMissCount(0);
-setResult(null);
+    setGreatCount(0);
+    setGoodCount(0);
+    setMissCount(0);
+    setResult(null);
 
-perfectCountRef.current = 0;
-greatCountRef.current = 0;
-goodCountRef.current = 0;
-missCountRef.current = 0;
-maxComboRef.current = 0;
+    myScoreRef.current = 0;
+    rivalScoreRef.current = 0;
+    perfectCountRef.current = 0;
+    greatCountRef.current = 0;
+    goodCountRef.current = 0;
+    missCountRef.current = 0;
+    maxComboRef.current = 0;
+    lunaGuardRef.current = false;
+    kaiBoostRef.current = false;
+    tauntMissRef.current = false;
+    laneReversedRef.current = false;
+    aiScoreMultiplierRef.current = 1;
+    aiNextSkillAtRef.current = Date.now() + 6500;
+    aiSkillIndexRef.current = 0;
+
+    setWaterBlock(false);
+    setTauntMiss(false);
+    setLaneReversed(false);
+    setLunaGuard(false);
+    setKaiBoost(false);
+    setAiSkillNotice(null);
     setScreen("battle");
     completeMission("daily1");
 
@@ -1146,24 +1184,45 @@ audio.onerror = () => {
     });
   }
 
- function handleMiss() {
-  setJudge("MISS");
-  setCombo(0);
+  function handleMiss() {
+    setJudge("MISS");
 
-  setMissCount((v) => {
-    const next = v + 1;
-    missCountRef.current = next;
-    return next;
-  });
-}
+    if (!lunaGuardRef.current) {
+      setCombo(0);
+    }
+
+    setMissCount((v) => {
+      const next = v + 1;
+      missCountRef.current = next;
+      return next;
+    });
+  }
+
+  function addMyScore(scoreDelta: number) {
+    setMyScore((prev) => {
+      const nextScore = Math.floor(prev + scoreDelta);
+      myScoreRef.current = nextScore;
+      syncOnlineScore(nextScore);
+      return nextScore;
+    });
+  }
+
+  function addRivalScore(scoreDelta: number) {
+    setRivalScore((prev) => {
+      const nextScore = Math.max(0, Math.floor(prev + scoreDelta));
+      rivalScoreRef.current = nextScore;
+      return nextScore;
+    });
+  }
 
   function hitLane(lane: number) {
     setPressedLane(lane);
     setTimeout(() => setPressedLane(null), 120);
 
     const current = battleElapsed;
+    const effectiveLane = (laneReversedRef.current ? 3 - lane : lane) as 0 | 1 | 2 | 3;
     const target = notes
-      .filter((n) => !n.hit && !n.missed && n.lane === lane)
+      .filter((n) => !n.hit && !n.missed && n.lane === effectiveLane)
       .sort((a, b) => Math.abs(a.time - current) - Math.abs(b.time - current))[0];
 
     if (!target) {
@@ -1181,6 +1240,14 @@ audio.onerror = () => {
     const nextJudge: Judge =
       diff <= PERFECT_WINDOW ? "PERFECT" : diff <= GREAT_WINDOW ? "GREAT" : "GOOD";
 
+    if (tauntMissRef.current && Math.random() < 0.3) {
+      setNotes((prev) =>
+        prev.map((n) => (n.id === target.id ? { ...n, missed: true } : n))
+      );
+      handleMiss();
+      return;
+    }
+
     const nextCombo = combo + 1;
     const lunaBonus = selectedCharacters.includes("luna") ? 2 : 1;
     const feverGain =
@@ -1192,7 +1259,7 @@ audio.onerror = () => {
     const scoreDelta =
       baseScore *
       getComboMultiplier(nextCombo) *
-      (skillActive === "kai" ? 2 : 1);
+      (kaiBoostRef.current ? 2 : 1);
 
     setNotes((prev) =>
       prev.map((n) => (n.id === target.id ? { ...n, hit: true } : n))
@@ -1200,47 +1267,42 @@ audio.onerror = () => {
 
     setJudge(nextJudge);
     setCombo(nextCombo);
-   setMaxCombo((prev) => {
-  const next = Math.max(prev, nextCombo);
-  maxComboRef.current = next;
-  return next;
-});
+    setMaxCombo((prev) => {
+      const next = Math.max(prev, nextCombo);
+      maxComboRef.current = next;
+      return next;
+    });
     setFever((prev) => clamp(prev + feverGain, 0, 100));
-
-    setMyScore((prev) => {
-  const nextScore = Math.floor(prev + scoreDelta);
-  myScoreRef.current = nextScore;
-  syncOnlineScore(nextScore);
-  return nextScore;
-});
+    addMyScore(scoreDelta);
 
     if (nextJudge === "PERFECT") {
-  setPerfectCount((v) => {
-    const next = v + 1;
-    perfectCountRef.current = next;
-    return next;
-  });
-}
+      setPerfectCount((v) => {
+        const next = v + 1;
+        perfectCountRef.current = next;
+        return next;
+      });
+    }
 
-if (nextJudge === "GREAT") {
-  setGreatCount((v) => {
-    const next = v + 1;
-    greatCountRef.current = next;
-    return next;
-  });
-}
+    if (nextJudge === "GREAT") {
+      setGreatCount((v) => {
+        const next = v + 1;
+        greatCountRef.current = next;
+        return next;
+      });
+    }
 
-if (nextJudge === "GOOD") {
-  setGoodCount((v) => {
-    const next = v + 1;
-    goodCountRef.current = next;
-    return next;
-  });
-}
+    if (nextJudge === "GOOD") {
+      setGoodCount((v) => {
+        const next = v + 1;
+        goodCountRef.current = next;
+        return next;
+      });
+    }
 
     if (nextCombo >= 20) completeMission("daily2");
-    if (perfectCount + 1 >= 10) completeMission("daily3");
+    if (perfectCountRef.current >= 10) completeMission("daily3");
   }
+
   useEffect(() => {
     function handleBattleKeyDown(event: KeyboardEvent) {
       if (screen !== "battle") return;
@@ -1274,13 +1336,143 @@ if (nextJudge === "GOOD") {
     return () => {
       window.removeEventListener("keydown", handleBattleKeyDown);
     };
-  }, [screen, battleElapsed, notes, combo, skillActive]);
+  }, [screen, battleElapsed, notes, combo, tauntMiss, laneReversed, lunaGuard, kaiBoost]);
+
+  function clearSkillFlag(skillId: string) {
+    if (skillId === "rio") setWaterBlock(false);
+    if (skillId === "mika") {
+      tauntMissRef.current = false;
+      setTauntMiss(false);
+    }
+    if (skillId === "jet") {
+      laneReversedRef.current = false;
+      setLaneReversed(false);
+    }
+    if (skillId === "luna") {
+      lunaGuardRef.current = false;
+      setLunaGuard(false);
+    }
+    if (skillId === "kai") {
+      kaiBoostRef.current = false;
+      setKaiBoost(false);
+    }
+  }
+
+  function applyPlayerBuff(skillId: string) {
+    if (skillId === "luna") {
+      lunaGuardRef.current = true;
+      setLunaGuard(true);
+      setTimeout(() => clearSkillFlag("luna"), 10000);
+    }
+
+    if (skillId === "kai") {
+      kaiBoostRef.current = true;
+      setKaiBoost(true);
+      setTimeout(() => clearSkillFlag("kai"), 8000);
+    }
+  }
+
+  function applyAiAttackToPlayer(skillId: string, skillName: string) {
+    setAiSkillNotice(`AI ${skillName}`);
+    setTimeout(() => setAiSkillNotice(null), 1100);
+
+    if (skillId === "rio") {
+      setWaterBlock(true);
+      setTimeout(() => setWaterBlock(false), 5000);
+    }
+
+    if (skillId === "mika") {
+      tauntMissRef.current = true;
+      setTauntMiss(true);
+      setTimeout(() => clearSkillFlag("mika"), 5000);
+    }
+
+    if (skillId === "jet") {
+      laneReversedRef.current = true;
+      setLaneReversed(true);
+      setTimeout(() => clearSkillFlag("jet"), 3500);
+    }
+  }
+
+  function applyPlayerAttackToAi(skillId: string) {
+    setAttackSuccess(true);
+    setTimeout(() => setAttackSuccess(false), 900);
+
+    if (skillId === "rio") {
+      addRivalScore(-300);
+      aiScoreMultiplierRef.current = 0.65;
+      setTimeout(() => {
+        aiScoreMultiplierRef.current = 1;
+      }, 5000);
+      return;
+    }
+
+    if (skillId === "mika") {
+      aiScoreMultiplierRef.current = 0.72;
+      setTimeout(() => {
+        aiScoreMultiplierRef.current = 1;
+      }, 5000);
+      return;
+    }
+
+    if (skillId === "jet") {
+      aiScoreMultiplierRef.current = 0.6;
+      setTimeout(() => {
+        aiScoreMultiplierRef.current = 1;
+      }, 3500);
+      return;
+    }
+
+    addRivalScore(-220);
+  }
+
+  function applyAiBuff(skillId: string, skillName: string) {
+    setAiSkillNotice(`AI ${skillName}`);
+    setTimeout(() => setAiSkillNotice(null), 1100);
+
+    if (skillId === "kai") {
+      aiScoreMultiplierRef.current = 1.7;
+      setTimeout(() => {
+        aiScoreMultiplierRef.current = 1;
+      }, 8000);
+    }
+
+    if (skillId === "luna") {
+      addRivalScore(280);
+    }
+  }
+
+  function maybeUseAiSkill(elapsed: number) {
+    if (battleMode !== "ai") return;
+    if (!aiCharacters.length) return;
+    if (elapsed < 6) return;
+    if (Date.now() < aiNextSkillAtRef.current) return;
+
+    const aiCharacterId = aiCharacters[aiSkillIndexRef.current % aiCharacters.length];
+    aiSkillIndexRef.current += 1;
+    aiNextSkillAtRef.current = Date.now() +
+      (aiDifficulty === "EASY" ? 16000 : aiDifficulty === "NORMAL" ? 13000 : 10000);
+
+    const aiCharacter = characters.find((c) => c.id === aiCharacterId);
+    if (!aiCharacter) return;
+
+    if (aiCharacter.type === "attack") {
+      applyAiAttackToPlayer(aiCharacter.id, aiCharacter.active);
+    } else {
+      applyAiBuff(aiCharacter.id, aiCharacter.active);
+    }
+  }
+
   function useSkill(character: Character) {
     if (fever < 100) return;
 
     setFever(0);
     setSkillActive(character.id);
     completeMission("daily4");
+
+    if (character.type === "buff") {
+      applyPlayerBuff(character.id);
+    }
 
     if (character.type === "attack") {
       if ((battleMode === "quick" || battleMode === "room") && onlineRoomCode) {
@@ -1294,13 +1486,11 @@ if (nextJudge === "GOOD") {
           roomCode: onlineRoomCode,
         });
       } else {
-        setAttackSuccess(true);
-        setTimeout(() => setAttackSuccess(false), 900);
-        setRivalScore((prev) => Math.max(0, prev - 220));
+        applyPlayerAttackToAi(character.id);
       }
     }
 
-    setTimeout(() => setSkillActive(null), 6000);
+    setTimeout(() => setSkillActive(null), 8000);
   }
 
   async function saveProgressToCloud(next: {
@@ -1374,10 +1564,10 @@ if (nextJudge === "GOOD") {
       myScore: finalMy,
       rivalScore: finalRival,
       perfect: perfectCountRef.current,
-great: greatCountRef.current,
-good: goodCountRef.current,
-miss: missCountRef.current,
-maxCombo: maxComboRef.current,
+      great: greatCountRef.current,
+      good: goodCountRef.current,
+      miss: missCountRef.current,
+      maxCombo: maxComboRef.current,
       exp,
       coins: rewardCoins,
       reason: surrendered
@@ -1423,14 +1613,14 @@ maxCombo: maxComboRef.current,
       onlineRoomCode
     ) {
       socket.emit("battleEnded", {
-  roomCode: onlineRoomCode,
-  reason: surrendered ? "surrender" : "timeUp",
-  scores: {
-    myScore: myScoreRef.current,
-    rivalScore: rivalScoreRef.current,
-    side: myOnlineSide,
-  },
-});
+        roomCode: onlineRoomCode,
+        reason: surrendered ? "surrender" : "timeUp",
+        scores: {
+          side: myOnlineSide,
+          myScore: myScoreRef.current,
+          rivalScore: rivalScoreRef.current,
+        },
+      });
     }
 
     setScreen("result");
@@ -1467,14 +1657,17 @@ maxCombo: maxComboRef.current,
       if (battleMode === "ai") {
         const aiPower =
           aiDifficulty === "EASY" ? 68 : aiDifficulty === "NORMAL" ? 86 : 105;
+        const nextAiScore = Math.max(
+          0,
+          Math.floor(
+            elapsed * aiPower * aiScoreMultiplierRef.current +
+              Math.sin(elapsed * 1.7) * 90
+          )
+        );
 
-     const nextAiScore = Math.max(
-  0,
-  Math.floor(elapsed * aiPower + Math.sin(elapsed * 1.7) * 90)
-);
-
-rivalScoreRef.current = nextAiScore;
-setRivalScore(nextAiScore);
+        rivalScoreRef.current = nextAiScore;
+        setRivalScore(nextAiScore);
+        maybeUseAiSkill(elapsed);
       }
 
       setNotes((prev) =>
@@ -1483,12 +1676,14 @@ setRivalScore(nextAiScore);
 
           if (elapsed > n.time + GOOD_WINDOW) {
             setMissCount((v) => {
-  const next = v + 1;
-  missCountRef.current = next;
-  return next;
-});
-setJudge("MISS");
-setCombo(0);
+              const next = v + 1;
+              missCountRef.current = next;
+              return next;
+            });
+            setJudge("MISS");
+            if (!lunaGuardRef.current) {
+              setCombo(0);
+            }
             return { ...n, missed: true };
           }
 
@@ -1986,13 +2181,19 @@ setCombo(0);
                       battleElapsed >= note.time - NOTE_FALL_TIME &&
                       battleElapsed <= note.time + NOTE_EXIT_AFTER
                   )
-                  .map((note) => (
-                    <div
-  key={note.id}
-  className={`battleNote ${note.type === "melody" ? "melodyNote" : "beatNote"}`}
-  style={getNoteStyle(note)}
-/>
-                  ))}
+                  .map((note) => {
+                    const hiddenByWater = waterBlock && battleElapsed < note.time - 0.65;
+
+                    return (
+                      <div
+                        key={note.id}
+                        className={`battleNote ${
+                          note.type === "melody" ? "melodyNote" : "beatNote"
+                        } ${hiddenByWater ? "hiddenByWater" : ""}`}
+                        style={getNoteStyle(note)}
+                      />
+                    );
+                  })}
 
                 {[0, 1, 2, 3].map((lane) => (
                   <button
@@ -2006,6 +2207,12 @@ setCombo(0);
               </div>
 
               {attackSuccess && <div className="attackSuccess">공격 성공!</div>}
+              {aiSkillNotice && <div className="skillEffectBadge">{aiSkillNotice}</div>}
+              {waterBlock && <div className="skillEffectBadge">💧 시야 방해</div>}
+              {tauntMiss && <div className="skillEffectBadge">😈 도발</div>}
+              {laneReversed && <div className="skillEffectBadge">🌀 좌우 반전</div>}
+              {lunaGuard && <div className="skillEffectBadge">🌙 콤보 보호</div>}
+              {kaiBoost && <div className="skillEffectBadge">🔥 점수 2배</div>}
 
               <div className="judgeFeedback">
                 <strong>{judge}</strong>
