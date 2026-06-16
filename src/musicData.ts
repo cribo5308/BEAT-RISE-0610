@@ -10,7 +10,7 @@ export const FUTURE_BASS_START_OFFSET = 30;
 export const FUTURE_BASS_DURATION = 60;
 export const FUTURE_BASS_BPM = 152;
 
-const BEAT = 60 / FUTURE_BASS_BPM; // 약 0.395초
+const BEAT = 60 / FUTURE_BASS_BPM;
 const BAR = BEAT * 4;
 
 function t(value: number) {
@@ -33,43 +33,27 @@ function makeNote(
   };
 }
 
-function addKickSnarePattern(
+// 쉬운 기본 리듬: 킥/스네어 중심
+function addEasyGroove(
   notes: BeatRiseChartNote[],
   startBar: number,
-  endBar: number,
-  intensity: "light" | "normal" | "drop"
+  endBar: number
 ) {
   for (let bar = startBar; bar < endBar; bar += 1) {
     const base = bar * BAR;
 
-    // 킥 느낌: 1박, 3박
+    // 1박, 3박만 사용
     notes.push(makeNote(base + BEAT * 0, 1, "beat"));
     notes.push(makeNote(base + BEAT * 2, 2, "beat"));
 
-    // 스네어 느낌: 2박, 4박
-    notes.push(makeNote(base + BEAT * 1, 3, "beat"));
-    notes.push(makeNote(base + BEAT * 3, 0, "beat"));
-
-    if (intensity === "normal" || intensity === "drop") {
-      // 중간 박자: 리듬감 추가
-      notes.push(makeNote(base + BEAT * 0.5, 0, "melody"));
-      notes.push(makeNote(base + BEAT * 2.5, 3, "melody"));
-    }
-
-    if (intensity === "drop") {
-      // 드롭 구간: 8분음표/싱코페이션 느낌
-      notes.push(makeNote(base + BEAT * 1.5, 2, "melody"));
-      notes.push(makeNote(base + BEAT * 3.5, 1, "melody"));
-
-      // 마디 끝 필인
-      if (bar % 2 === 1) {
-        notes.push(makeNote(base + BEAT * 3.25, 0, "melody"));
-        notes.push(makeNote(base + BEAT * 3.75, 3, "melody"));
-      }
+    // 2마디마다 한 번만 장식 노트
+    if (bar % 2 === 1) {
+      notes.push(makeNote(base + BEAT * 3, 3, "melody"));
     }
   }
 }
 
+// 빌드업: 조금 더 리듬감 있게, 그래도 과하지 않게
 function addBuildUp(
   notes: BeatRiseChartNote[],
   startBar: number,
@@ -79,56 +63,39 @@ function addBuildUp(
     const base = bar * BAR;
 
     notes.push(makeNote(base + BEAT * 0, 0, "beat"));
-    notes.push(makeNote(base + BEAT * 1, 1, "beat"));
-    notes.push(makeNote(base + BEAT * 2, 2, "beat"));
-    notes.push(makeNote(base + BEAT * 3, 3, "beat"));
+    notes.push(makeNote(base + BEAT * 1.5, 1, "melody"));
+    notes.push(makeNote(base + BEAT * 3, 2, "beat"));
 
-    // 빌드업 후반으로 갈수록 촘촘하게
-    if (bar >= startBar + 2) {
-      notes.push(makeNote(base + BEAT * 0.5, 1, "melody"));
-      notes.push(makeNote(base + BEAT * 1.5, 2, "melody"));
-      notes.push(makeNote(base + BEAT * 2.5, 1, "melody"));
-      notes.push(makeNote(base + BEAT * 3.5, 2, "melody"));
-    }
-
+    // 마지막 2마디만 살짝 긴장감 추가
     if (bar >= endBar - 2) {
-      notes.push(makeNote(base + BEAT * 3.25, 0, "melody"));
-      notes.push(makeNote(base + BEAT * 3.5, 1, "melody"));
-      notes.push(makeNote(base + BEAT * 3.75, 2, "melody"));
+      notes.push(makeNote(base + BEAT * 3.5, 3, "melody"));
     }
   }
 }
 
-function addDropHook(
+// 드롭: 리듬 타는 느낌은 살리되 한 번에 많이 안 떨어지게
+function addEasyDrop(
   notes: BeatRiseChartNote[],
   startBar: number,
   endBar: number
 ) {
-  const hookPattern = [
+  const patternA = [
     { beat: 0, lane: 1, type: "beat" },
-    { beat: 0.5, lane: 2, type: "melody" },
     { beat: 1, lane: 3, type: "beat" },
-    { beat: 1.5, lane: 1, type: "melody" },
     { beat: 2, lane: 0, type: "beat" },
-    { beat: 2.5, lane: 2, type: "melody" },
-    { beat: 3, lane: 3, type: "beat" },
-    { beat: 3.5, lane: 0, type: "melody" },
+    { beat: 3, lane: 2, type: "melody" },
   ] as const;
 
-  const hookPatternAlt = [
+  const patternB = [
     { beat: 0, lane: 2, type: "beat" },
-    { beat: 0.5, lane: 1, type: "melody" },
     { beat: 1, lane: 0, type: "beat" },
-    { beat: 1.5, lane: 2, type: "melody" },
     { beat: 2, lane: 3, type: "beat" },
-    { beat: 2.5, lane: 1, type: "melody" },
-    { beat: 3, lane: 0, type: "beat" },
-    { beat: 3.5, lane: 3, type: "melody" },
+    { beat: 3, lane: 1, type: "melody" },
   ] as const;
 
   for (let bar = startBar; bar < endBar; bar += 1) {
     const base = bar * BAR;
-    const pattern = bar % 2 === 0 ? hookPattern : hookPatternAlt;
+    const pattern = bar % 2 === 0 ? patternA : patternB;
 
     pattern.forEach((item) => {
       notes.push(
@@ -140,11 +107,26 @@ function addDropHook(
       );
     });
 
-    // 4마디마다 강조 필인
+    // 4마디마다 마지막에 한 개만 포인트
     if (bar % 4 === 3) {
-      notes.push(makeNote(base + BEAT * 3.25, 0, "melody"));
-      notes.push(makeNote(base + BEAT * 3.5, 1, "melody"));
-      notes.push(makeNote(base + BEAT * 3.75, 2, "melody"));
+      notes.push(makeNote(base + BEAT * 3.5, 3, "melody"));
+    }
+  }
+}
+
+// 쉬어가는 구간
+function addBreak(
+  notes: BeatRiseChartNote[],
+  startBar: number,
+  endBar: number
+) {
+  for (let bar = startBar; bar < endBar; bar += 1) {
+    const base = bar * BAR;
+
+    notes.push(makeNote(base + BEAT * 0, 1, "beat"));
+
+    if (bar % 2 === 0) {
+      notes.push(makeNote(base + BEAT * 2, 2, "melody"));
     }
   }
 }
@@ -152,23 +134,23 @@ function addDropHook(
 function makeFutureBassChart() {
   const notes: BeatRiseChartNote[] = [];
 
-  // 0~8초: 인트로, 너무 빽빽하지 않게
-  addKickSnarePattern(notes, 0, 5, "light");
+  // 0~8초: 쉬운 인트로
+  addEasyGroove(notes, 0, 5);
 
   // 8~16초: 빌드업
   addBuildUp(notes, 5, 10);
 
-  // 16~34초: 드롭 메인 훅
-  addDropHook(notes, 10, 22);
+  // 16~34초: 드롭, 하지만 쉬운 패턴
+  addEasyDrop(notes, 10, 22);
 
-  // 34~44초: 드롭 반복 + 약간 여유
-  addKickSnarePattern(notes, 22, 28, "drop");
+  // 34~44초: 드롭 반복
+  addEasyDrop(notes, 22, 28);
 
-  // 44~52초: 브릿지, 숨 쉴 구간
-  addKickSnarePattern(notes, 28, 33, "normal");
+  // 44~52초: 쉬어가는 구간
+  addBreak(notes, 28, 33);
 
-  // 52~60초: 마지막 몰아치기
-  addDropHook(notes, 33, 38);
+  // 52~60초: 마지막 드롭
+  addEasyDrop(notes, 33, 38);
 
   return notes
     .filter((note) => note.time >= 0 && note.time <= FUTURE_BASS_DURATION)
@@ -177,8 +159,8 @@ function makeFutureBassChart() {
       const prev = array[index - 1];
       if (!prev) return true;
 
-      // 같은 레인에 너무 가까운 노트 중복 제거
-      return !(prev.lane === note.lane && Math.abs(prev.time - note.time) < 0.08);
+      // 너무 가까운 노트 제거
+      return Math.abs(prev.time - note.time) >= 0.18;
     });
 }
 
@@ -197,7 +179,7 @@ export const MUSIC_TRACKS = [
     id: "future-bass-drop",
     title: "Future Bass Drop",
     bpm: FUTURE_BASS_BPM,
-    difficulty: "HARD" as const,
+    difficulty: "NORMAL" as const,
     audioSrc: "/audio/alex-morgan-future-bass-drop-537458.mp3",
     startOffset: FUTURE_BASS_START_OFFSET,
     duration: FUTURE_BASS_DURATION,
