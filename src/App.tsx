@@ -2209,7 +2209,6 @@ async function signInWithKakao() {
             </button>
             <button className="menuListButton">고객 지원</button>
             {session ? (
-            {session ? (
   <button className="menuListButton danger" onClick={signOut}>
     로그아웃
   </button>
