@@ -330,6 +330,8 @@ export default function App() {
   const [myScore, setMyScore] = useState(0);
   const [rivalScore, setRivalScore] = useState(0);
   const [combo, setCombo] = useState(0);
+  const myScoreRef = useRef(0);
+  const rivalScoreRef = useRef(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [fever, setFever] = useState(0);
   const [pressedLane, setPressedLane] = useState<number | null>(null);
@@ -1060,6 +1062,8 @@ async function signInWithKakao() {
     setRivalScore(0);
     setCombo(0);
     setMaxCombo(0);
+    myScoreRef.current = 0;
+    rivalScoreRef.current = 0;
     setFever(0);
     setJudge("");
     setAttackSuccess(false);
@@ -1175,10 +1179,11 @@ audio.onerror = () => {
     setFever((prev) => clamp(prev + feverGain, 0, 100));
 
     setMyScore((prev) => {
-      const nextScore = Math.floor(prev + scoreDelta);
-      syncOnlineScore(nextScore);
-      return nextScore;
-    });
+  const nextScore = Math.floor(prev + scoreDelta);
+  myScoreRef.current = nextScore;
+  syncOnlineScore(nextScore);
+  return nextScore;
+});
 
     if (nextJudge === "PERFECT") setPerfectCount((v) => v + 1);
     if (nextJudge === "GREAT") setGreatCount((v) => v + 1);
@@ -1376,9 +1381,13 @@ audio.onerror = () => {
         const aiPower =
           aiDifficulty === "EASY" ? 68 : aiDifficulty === "NORMAL" ? 86 : 105;
 
-        setRivalScore(
-          Math.max(0, Math.floor(elapsed * aiPower + Math.sin(elapsed * 1.7) * 90))
-        );
+     const nextAiScore = Math.max(
+  0,
+  Math.floor(elapsed * aiPower + Math.sin(elapsed * 1.7) * 90)
+);
+
+rivalScoreRef.current = nextAiScore;
+setRivalScore(nextAiScore);
       }
 
       setNotes((prev) =>
