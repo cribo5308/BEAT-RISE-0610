@@ -2094,3 +2094,25 @@ p {
   content: "  ♪";
   opacity: 0.7;
 }
+.loginButtonGroup {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.kakaoLoginButton {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 16px;
+  background: #fee500;
+  color: #191919;
+  font-size: 14px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.kakaoMenuButton {
+  background: #fee500;
+  color: #191919;
+}
