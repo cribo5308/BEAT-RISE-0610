@@ -1,0 +1,23 @@
+{
+  "name": "Beat Rise",
+  "short_name": "Beat Rise",
+  "description": "온라인 리듬 배틀 게임 Beat Rise",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080812",
+  "theme_color": "#8b5cff",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
