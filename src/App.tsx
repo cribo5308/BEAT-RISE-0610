@@ -332,7 +332,7 @@ export default function App() {
   const [combo, setCombo] = useState(0);
   const myScoreRef = useRef(0);
   const rivalScoreRef = useRef(0);
-  const [maxCombo, setMaxCombo] = useState(0);
+  const [, setMaxCombo] = useState(0);
   const [fever, setFever] = useState(0);
   const [pressedLane, setPressedLane] = useState<number | null>(null);
   const [judge, setJudge] = useState<Judge>("");
@@ -340,14 +340,14 @@ export default function App() {
   const [skillActive, setSkillActive] = useState<string | null>(null);
 
   const [perfectCount, setPerfectCount] = useState(0);
-  const [greatCount, setGreatCount] = useState(0);
-  const [goodCount, setGoodCount] = useState(0);
-  const [missCount, setMissCount] = useState(0);
+  const [, setGreatCount] = useState(0);
+  const [, setGoodCount] = useState(0);
+  const [, setMissCount] = useState(0);
   const perfectCountRef = useRef(0);
-const greatCountRef = useRef(0);
-const goodCountRef = useRef(0);
-const missCountRef = useRef(0);
-const maxComboRef = useRef(0);
+  const greatCountRef = useRef(0);
+  const goodCountRef = useRef(0);
+  const missCountRef = useRef(0);
+  const maxComboRef = useRef(0);
 
   const [result, setResult] = useState<ResultData | null>(null);
 
