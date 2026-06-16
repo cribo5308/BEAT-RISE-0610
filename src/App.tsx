@@ -343,6 +343,11 @@ export default function App() {
   const [greatCount, setGreatCount] = useState(0);
   const [goodCount, setGoodCount] = useState(0);
   const [missCount, setMissCount] = useState(0);
+  const perfectCountRef = useRef(0);
+const greatCountRef = useRef(0);
+const goodCountRef = useRef(0);
+const missCountRef = useRef(0);
+const maxComboRef = useRef(0);
 
   const [result, setResult] = useState<ResultData | null>(null);
 
@@ -1078,10 +1083,16 @@ async function signInWithKakao() {
     setAttackSuccess(false);
     setSkillActive(null);
     setPerfectCount(0);
-    setGreatCount(0);
-    setGoodCount(0);
-    setMissCount(0);
-    setResult(null);
+setGreatCount(0);
+setGoodCount(0);
+setMissCount(0);
+setResult(null);
+
+perfectCountRef.current = 0;
+greatCountRef.current = 0;
+goodCountRef.current = 0;
+missCountRef.current = 0;
+maxComboRef.current = 0;
     setScreen("battle");
     completeMission("daily1");
 
@@ -1135,11 +1146,16 @@ audio.onerror = () => {
     });
   }
 
-  function handleMiss() {
-    setJudge("MISS");
-    setCombo(0);
-    setMissCount((v) => v + 1);
-  }
+ function handleMiss() {
+  setJudge("MISS");
+  setCombo(0);
+
+  setMissCount((v) => {
+    const next = v + 1;
+    missCountRef.current = next;
+    return next;
+  });
+}
 
   function hitLane(lane: number) {
     setPressedLane(lane);
@@ -1184,7 +1200,11 @@ audio.onerror = () => {
 
     setJudge(nextJudge);
     setCombo(nextCombo);
-    setMaxCombo((prev) => Math.max(prev, nextCombo));
+   setMaxCombo((prev) => {
+  const next = Math.max(prev, nextCombo);
+  maxComboRef.current = next;
+  return next;
+});
     setFever((prev) => clamp(prev + feverGain, 0, 100));
 
     setMyScore((prev) => {
@@ -1194,9 +1214,29 @@ audio.onerror = () => {
   return nextScore;
 });
 
-    if (nextJudge === "PERFECT") setPerfectCount((v) => v + 1);
-    if (nextJudge === "GREAT") setGreatCount((v) => v + 1);
-    if (nextJudge === "GOOD") setGoodCount((v) => v + 1);
+    if (nextJudge === "PERFECT") {
+  setPerfectCount((v) => {
+    const next = v + 1;
+    perfectCountRef.current = next;
+    return next;
+  });
+}
+
+if (nextJudge === "GREAT") {
+  setGreatCount((v) => {
+    const next = v + 1;
+    greatCountRef.current = next;
+    return next;
+  });
+}
+
+if (nextJudge === "GOOD") {
+  setGoodCount((v) => {
+    const next = v + 1;
+    goodCountRef.current = next;
+    return next;
+  });
+}
 
     if (nextCombo >= 20) completeMission("daily2");
     if (perfectCount + 1 >= 10) completeMission("daily3");
@@ -1333,11 +1373,11 @@ audio.onerror = () => {
       victory,
       myScore: finalMy,
       rivalScore: finalRival,
-      perfect: perfectCount,
-      great: greatCount,
-      good: goodCount,
-      miss: missCount,
-      maxCombo,
+      perfect: perfectCountRef.current,
+great: greatCountRef.current,
+good: goodCountRef.current,
+miss: missCountRef.current,
+maxCombo: maxComboRef.current,
       exp,
       coins: rewardCoins,
       reason: surrendered
@@ -1442,9 +1482,13 @@ setRivalScore(nextAiScore);
           if (n.hit || n.missed) return n;
 
           if (elapsed > n.time + GOOD_WINDOW) {
-            setMissCount((v) => v + 1);
-            setJudge("MISS");
-            setCombo(0);
+            setMissCount((v) => {
+  const next = v + 1;
+  missCountRef.current = next;
+  return next;
+});
+setJudge("MISS");
+setCombo(0);
             return { ...n, missed: true };
           }
 
