@@ -2049,20 +2049,25 @@ async function signInWithKakao() {
               </div>
             </div>
 
-            {authLoading ? (
-              <button className="profileLoginButton" disabled>
-                로그인 확인 중...
-              </button>
-            ) : session ? (
-              <button className="profileLoginButton" onClick={signOut}>
-                로그아웃
-              </button>
-            ) : (
-              <button className="profileLoginButton" onClick={signInWithGoogle}>
-                Google 계정으로 로그인
-              </button>
-            )}
+           {authLoading ? (
+  <button className="profileLoginButton" disabled>
+    로그인 확인 중...
+  </button>
+) : session ? (
+  <button className="profileLoginButton" onClick={signOut}>
+    로그아웃
+  </button>
+) : (
+  <div className="loginButtonGroup">
+    <button className="profileLoginButton" onClick={signInWithGoogle}>
+      Google 계정으로 로그인
+    </button>
 
+    <button className="kakaoLoginButton" onClick={signInWithKakao}>
+      카카오 계정으로 로그인
+    </button>
+  </div>
+)}
             <div className="recordPreview">
               <h3>최근 전적</h3>
               <div>
