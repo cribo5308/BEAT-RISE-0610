@@ -2145,3 +2145,33 @@ p {
   z-index: 20;
   pointer-events: none;
 }
+.tutorialArrowRow {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 24px;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  gap: 10px;
+  align-items: center;
+}
+
+.tutorialArrowButton {
+  height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 22px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.tutorialArrowButton:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.tutorialMainButton {
+  height: 48px;
+}
