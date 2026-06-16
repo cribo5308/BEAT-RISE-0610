@@ -1192,7 +1192,40 @@ audio.onerror = () => {
     if (nextCombo >= 20) completeMission("daily2");
     if (perfectCount + 1 >= 10) completeMission("daily3");
   }
+  useEffect(() => {
+    function handleBattleKeyDown(event: KeyboardEvent) {
+      if (screen !== "battle") return;
+      if (event.repeat) return;
 
+      const key = event.key.toLowerCase();
+
+      if (key === "d") {
+        event.preventDefault();
+        hitLane(0);
+      }
+
+      if (key === "f") {
+        event.preventDefault();
+        hitLane(1);
+      }
+
+      if (key === "j") {
+        event.preventDefault();
+        hitLane(2);
+      }
+
+      if (key === "k") {
+        event.preventDefault();
+        hitLane(3);
+      }
+    }
+
+    window.addEventListener("keydown", handleBattleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleBattleKeyDown);
+    };
+  }, [screen, battleElapsed, notes, combo, skillActive]);
   function useSkill(character: Character) {
     if (fever < 100) return;
 
