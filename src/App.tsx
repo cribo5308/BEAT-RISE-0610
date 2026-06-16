@@ -3052,3 +3052,15 @@ function Placeholder({
     </div>
   );
 }
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(() => {
+        console.log("Beat Rise service worker registered");
+      })
+      .catch((error) => {
+        console.log("Service worker registration failed:", error);
+      });
+  });
+}
