@@ -1790,14 +1790,14 @@ export default function App() {
                 <span>{profile.nickname}</span>
               </div>
 
-              <div className="battleScore">
-                <strong>
-                  {myScore} : {rivalScore}
-                </strong>
-                <span>
-                  {Math.max(0, selectedMusic.duration - battleElapsed).toFixed(1)}s
-                </span>
-              </div>
+          <div className="battleScore">
+  <strong>
+    {myScore} : {rivalScore}
+  </strong>
+  <span>
+    {Math.max(0, selectedMusic.duration - battleElapsed).toFixed(1)}s
+  </span>
+</div>
 
               <div className="battleProfile right">
                 <span>
@@ -1847,12 +1847,10 @@ export default function App() {
                   )
                   .map((note) => (
                     <div
-                      key={note.id}
-                      className={`battleNote ${
-                        note.type === "melody" ? "melodyNote" : "beatNote"
-                      }`}
-                      style={getNoteStyle(note)}
-                    />
+  key={note.id}
+  className={`battleNote ${note.type === "melody" ? "melodyNote" : "beatNote"}`}
+  style={getNoteStyle(note)}
+/>
                   ))}
 
                 {[0, 1, 2, 3].map((lane) => (
