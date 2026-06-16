@@ -706,23 +706,24 @@ export default function App() {
     });
   }
 
-  async function signInWithGoogle() {
-    const redirectUrl =
-      window.location.hostname === "localhost"
-        ? "http://localhost:5173"
-        : "https://beat-rise-0610.netlify.app";
+async function signInWithKakao() {
+  const redirectUrl =
+    window.location.hostname === "localhost"
+      ? "http://localhost:5173"
+      : "https://beat-rise-0610.netlify.app";
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "kakao",
+    options: {
+      redirectTo: redirectUrl,
+      scopes: "profile_nickname profile_image",
+    },
+  });
 
-    if (error) {
-      alert(`로그인 실패: ${error.message}`);
-    }
+  if (error) {
+    alert(`카카오 로그인 실패: ${error.message}`);
   }
+}
 async function signInWithKakao() {
   const redirectUrl =
     window.location.hostname === "localhost"
