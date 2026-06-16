@@ -1072,18 +1072,41 @@ async function signInWithKakao() {
     setScreen("battle");
     completeMission("daily1");
 
-    const audio = audioRef.current;
+const audio = audioRef.current;
 
-    if (audio) {
-      audio.pause();
-      audio.src = selectedMusic.audioSrc;
-      audio.currentTime = selectedMusic.startOffset;
-      audio.volume = sound / 100;
+if (!audio) {
+  alert("audioRef가 비어있어서 음악을 재생할 수 없어.");
+} else {
+  audio.pause();
+  audio.src = selectedMusic.audioSrc;
+  audio.muted = false;
+  audio.volume = Math.max(0.6, Math.min(1, sound / 100));
 
-      audio.play().catch((error) => {
+  const startMusic = () => {
+    try {
+      audio.currentTime = selectedMusic.startOffset || 0;
+    } catch (error) {
+      console.log("음악 시작 위치 설정 실패:", error);
+    }
+
+    audio
+      .play()
+      .then(() => {
+        console.log("음악 재생 성공");
+      })
+      .catch((error) => {
+        alert(`음악 재생 실패: ${error.message}`);
         console.log("음악 재생 실패:", error);
       });
-    }
+  };
+
+  audio.onloadedmetadata = startMusic;
+  audio.onerror = () => {
+    alert("음악 파일을 불러오지 못했어. audioSrc 경로를 확인해야 해.");
+  };
+
+  audio.load();
+}
 
     console.log("onlineSeed:", onlineSeed);
   }
@@ -1445,7 +1468,7 @@ async function signInWithKakao() {
   return (
     <main className="app" style={{ ["--phone-ratio" as string]: PHONE_RATIO }}>
       <section className="phone">
-        <audio ref={audioRef} preload="auto" />
+        <audio ref={audioRef} preload="auto" playsInline />
 
         {screen === "home" && (
           <div className="screen homeScreen">
