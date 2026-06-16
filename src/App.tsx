@@ -200,6 +200,10 @@ const tutorialPages = [
     title: "노트 치는 법",
     desc: "노트가 아래 판정선에 정확히 걸치는 순간 같은 레인을 누르면 돼.",
   },
+    {
+    title: "컴퓨터 조작법",
+    desc: "PC에서는 D F J K로 4개 레인을 입력해. 좌 Shift는 1번 캐릭터 스킬, 좌 Ctrl은 2번 캐릭터 스킬이야.",
+  },
   {
     title: "판정",
     desc: "판정은 PERFECT, GREAT, GOOD, MISS 네 단계로 표시돼.",
@@ -286,7 +290,9 @@ export default function App() {
   const [friendOpen, setFriendOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
 
-  const [tutorialSeen, setTutorialSeen] = useState(false);
+  const [tutorialSeen, setTutorialSeen] = useState(() => {
+  return localStorage.getItem("beatRiseTutorialSeen") === "true";
+});
   const [tutorialPage, setTutorialPage] = useState(0);
 
   const [sound, setSound] = useState(70);
@@ -1066,9 +1072,10 @@ async function signInWithKakao() {
   }
 
   function finishTutorial() {
-    setTutorialSeen(true);
-    setScreen("battleMenu");
-  }
+  localStorage.setItem("beatRiseTutorialSeen", "true");
+  setTutorialSeen(true);
+  setScreen("battleMenu");
+}
 
   function toggleCharacter(id: string, target: "player" | "ai") {
     const setter = target === "player" ? setSelectedCharacters : setAiCharacters;
@@ -1302,7 +1309,72 @@ audio.onerror = () => {
     if (nextCombo >= 20) completeMission("daily2");
     if (perfectCountRef.current >= 10) completeMission("daily3");
   }
+  useEffect(() => {
+    function handleBattleKeyDown(event: KeyboardEvent) {
+      if (screen !== "battle") return;
+      if (event.repeat) return;
 
+      const key = event.key.toLowerCase();
+
+      if (key === "d") {
+        event.preventDefault();
+        hitLane(0);
+        return;
+      }
+
+      if (key === "f") {
+        event.preventDefault();
+        hitLane(1);
+        return;
+      }
+
+      if (key === "j") {
+        event.preventDefault();
+        hitLane(2);
+        return;
+      }
+
+      if (key === "k") {
+        event.preventDefault();
+        hitLane(3);
+        return;
+      }
+
+      if (event.code === "ShiftLeft") {
+        event.preventDefault();
+
+        const firstCharacter = selectedCharacterObjects[0];
+        if (firstCharacter) useSkill(firstCharacter);
+
+        return;
+      }
+
+      if (event.code === "ControlLeft") {
+        event.preventDefault();
+
+        const secondCharacter = selectedCharacterObjects[1];
+        if (secondCharacter) useSkill(secondCharacter);
+      }
+    }
+
+    window.addEventListener("keydown", handleBattleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleBattleKeyDown);
+    };
+  }, [
+    screen,
+    battleElapsed,
+    notes,
+    combo,
+    fever,
+    selectedCharacterObjects,
+    waterBlock,
+    tauntMiss,
+    laneReversed,
+    lunaGuard,
+    kaiBoost,
+  ]);
   useEffect(() => {
     function handleBattleKeyDown(event: KeyboardEvent) {
       if (screen !== "battle") return;
@@ -1848,19 +1920,40 @@ audio.onerror = () => {
               <p>{tutorialPages[tutorialPage].desc}</p>
             </div>
             <div className="tutorialDots">
-              {tutorialPages.map((_, i) => (
-                <span key={i} className={i === tutorialPage ? "active" : ""} />
-              ))}
-            </div>
-            <button
-              className="primaryButton bottomAction"
-              onClick={() => {
-                if (tutorialPage >= tutorialPages.length - 1) finishTutorial();
-                else setTutorialPage((v) => v + 1);
-              }}
-            >
-              {tutorialPage >= tutorialPages.length - 1 ? "배틀 시작하기" : "다음"}
-            </button>
+  {tutorialPages.map((_, i) => (
+    <span key={i} className={i === tutorialPage ? "active" : ""} />
+  ))}
+</div>
+
+<div className="tutorialArrowRow">
+  <button
+    className="tutorialArrowButton"
+    disabled={tutorialPage <= 0}
+    onClick={() => setTutorialPage((v) => Math.max(0, v - 1))}
+  >
+    ←
+  </button>
+
+  <button
+    className="primaryButton tutorialMainButton"
+    onClick={() => {
+      if (tutorialPage >= tutorialPages.length - 1) finishTutorial();
+      else setTutorialPage((v) => v + 1);
+    }}
+  >
+    {tutorialPage >= tutorialPages.length - 1 ? "배틀 시작하기" : "다음"}
+  </button>
+
+  <button
+    className="tutorialArrowButton"
+    disabled={tutorialPage >= tutorialPages.length - 1}
+    onClick={() =>
+      setTutorialPage((v) => Math.min(tutorialPages.length - 1, v + 1))
+    }
+  >
+    →
+  </button>
+</div>
           </div>
         )}
 
@@ -2536,9 +2629,16 @@ audio.onerror = () => {
                 {vibration ? "ON" : "OFF"}
               </button>
             </div>
-            <button className="menuListButton" onClick={() => setScreen("tutorial")}>
-              튜토리얼 다시 보기
-            </button>
+            <button
+  className="menuListButton"
+  onClick={() => {
+    setTutorialPage(0);
+    setScreen("tutorial");
+    setMenuOpen(false);
+  }}
+>
+  튜토리얼 다시 보기
+</button>
             <button className="menuListButton">고객 지원</button>
             {session ? (
   <button className="menuListButton danger" onClick={signOut}>
