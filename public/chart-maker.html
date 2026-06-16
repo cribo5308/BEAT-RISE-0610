@@ -1,1 +1,243 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beat Rise Chart Maker</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #080812;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
 
+      h1 {
+        margin-top: 0;
+      }
+
+      button {
+        padding: 12px 16px;
+        margin: 6px;
+        border: 0;
+        border-radius: 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: #8b5cff;
+        color: white;
+      }
+
+      .danger {
+        background: #ff3d71;
+        color: white;
+      }
+
+      .laneBox {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 20px 0;
+      }
+
+      .lane {
+        padding: 28px 8px;
+        border-radius: 16px;
+        text-align: center;
+        font-size: 26px;
+        font-weight: 1000;
+        background: #17172a;
+        border: 2px solid #33335a;
+      }
+
+      .lane.active {
+        background: #24e8ff;
+        color: #05050a;
+      }
+
+      textarea {
+        width: 100%;
+        height: 360px;
+        background: #11111f;
+        color: #9effb8;
+        border: 1px solid #33335a;
+        border-radius: 12px;
+        padding: 12px;
+        font-family: Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .info {
+        line-height: 1.6;
+        opacity: 0.86;
+      }
+
+      .time {
+        font-size: 32px;
+        font-weight: 1000;
+        margin: 12px 0;
+      }
+
+      .small {
+        opacity: 0.75;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Beat Rise Chart Maker</h1>
+
+    <p class="info">
+      D F J K를 음악에 맞춰 누르면 노트 시간이 기록돼.<br />
+      Shift를 누른 상태로 D/F/J/K를 누르면 melody 노트로 기록돼.<br />
+      그냥 누르면 beat 노트야.
+    </p>
+
+    <audio
+      id="audio"
+      controls
+      preload="auto"
+      src="/audio/alex-morgan-future-bass-drop-537458.mp3"
+    ></audio>
+
+    <div class="time" id="timeText">0.000s</div>
+
+    <button class="primary" onclick="startFromOffset()">30초부터 시작</button>
+    <button onclick="startFromZero()">처음부터 시작</button>
+    <button onclick="pauseMusic()">일시정지</button>
+    <button onclick="exportChart()">차트 코드 만들기</button>
+    <button class="danger" onclick="clearNotes()">전체 삭제</button>
+
+    <p class="small">
+      현재 설정: 게임 기준 time 0 = 원곡 30초 지점
+    </p>
+
+    <div class="laneBox">
+      <div class="lane" id="lane0">D<br />0</div>
+      <div class="lane" id="lane1">F<br />1</div>
+      <div class="lane" id="lane2">J<br />2</div>
+      <div class="lane" id="lane3">K<br />3</div>
+    </div>
+
+    <h2>기록된 노트</h2>
+    <textarea id="output" readonly></textarea>
+
+    <script>
+      const audio = document.getElementById("audio");
+      const timeText = document.getElementById("timeText");
+      const output = document.getElementById("output");
+
+      const START_OFFSET = 30;
+      const notes = [];
+
+      const keyToLane = {
+        d: 0,
+        f: 1,
+        j: 2,
+        k: 3,
+      };
+
+      function getGameTime() {
+        return Math.max(0, audio.currentTime - START_OFFSET);
+      }
+
+      function flashLane(lane) {
+        const el = document.getElementById(`lane${lane}`);
+        el.classList.add("active");
+        setTimeout(() => el.classList.remove("active"), 90);
+      }
+
+      function recordNote(lane, type) {
+        const time = Number(getGameTime().toFixed(3));
+
+        notes.push({
+          time,
+          lane,
+          type,
+        });
+
+        notes.sort((a, b) => a.time - b.time);
+
+        flashLane(lane);
+        renderRaw();
+      }
+
+      function renderRaw() {
+        output.value = notes
+          .map(
+            (note) =>
+              `{ time: ${note.time}, lane: ${note.lane}, type: "${note.type}" },`
+          )
+          .join("\n");
+      }
+
+      function exportChart() {
+        const code =
+`export const futureBassChart: BeatRiseChartNote[] = [
+${notes
+  .map(
+    (note) =>
+      `  { time: ${note.time}, lane: ${note.lane} as const, type: "${note.type}" },`
+  )
+  .join("\n")}
+];
+
+export const futureBassBeatNotes = futureBassChart.filter(
+  (note) => note.type === "beat"
+);
+
+export const futureBassMelodyNotes = futureBassChart.filter(
+  (note) => note.type === "melody"
+);`;
+
+        output.value = code;
+        output.select();
+        navigator.clipboard.writeText(code).catch(() => {});
+      }
+
+      function clearNotes() {
+        if (!confirm("진짜 전체 삭제할까?")) return;
+        notes.length = 0;
+        renderRaw();
+      }
+
+      function startFromOffset() {
+        audio.currentTime = START_OFFSET;
+        audio.play();
+      }
+
+      function startFromZero() {
+        audio.currentTime = 0;
+        audio.play();
+      }
+
+      function pauseMusic() {
+        audio.pause();
+      }
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+
+        if (!(key in keyToLane)) return;
+
+        event.preventDefault();
+
+        const lane = keyToLane[key];
+        const type = event.shiftKey ? "melody" : "beat";
+
+        recordNote(lane, type);
+      });
+
+      function tick() {
+        timeText.textContent = `${getGameTime().toFixed(3)}s`;
+        requestAnimationFrame(tick);
+      }
+
+      tick();
+    </script>
+  </body>
+</html>
