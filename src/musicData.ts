@@ -11,7 +11,7 @@ const melodyLanePattern = [3, 2, 0, 1, 3, 0, 2, 1, 3, 2, 1, 0] as const;
 
 // 원곡 기준 30초 ~ 1분 30초 사용
 // 게임에서는 time 0 = 원곡 30초 지점
-export const FUTURE_BASS_START_OFFSET = 0;
+export const FUTURE_BASS_START_OFFSET = 30;
 export const FUTURE_BASS_DURATION = 60;
 export const FUTURE_BASS_BPM = 152;
 
