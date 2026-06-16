@@ -2116,3 +2116,13 @@ p {
   background: #fee500;
   color: #191919;
 }
+.keyLabel {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 1000;
+  color: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
