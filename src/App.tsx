@@ -1262,7 +1262,7 @@ audio.onerror = () => {
     const notifyServer = options?.notifyServer ?? true;
 
     const finalMy = myScoreRef.current;
-const finalRival = rivalScoreRef.current;
+    const finalRival = rivalScoreRef.current;
 
     let victory: ResultData["victory"];
 
