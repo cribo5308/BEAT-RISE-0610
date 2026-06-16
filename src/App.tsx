@@ -335,7 +335,7 @@ export default function App() {
   const [pressedLane, setPressedLane] = useState<number | null>(null);
   const [judge, setJudge] = useState<Judge>("");
   const [attackSuccess, setAttackSuccess] = useState(false);
-  const [skillActive, setSkillActive] = useState<string | null>(null);
+  const [, setSkillActive] = useState<string | null>(null);
 
   const myScoreRef = useRef(0);
   const rivalScoreRef = useRef(0);
