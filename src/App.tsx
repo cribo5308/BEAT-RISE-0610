@@ -1261,8 +1261,8 @@ audio.onerror = () => {
     const opponentSurrendered = options?.opponentSurrendered ?? false;
     const notifyServer = options?.notifyServer ?? true;
 
-    const finalMy = myScore;
-    const finalRival = rivalScore;
+    const finalMy = myScoreRef.current;
+const finalRival = rivalScoreRef.current;
 
     let victory: ResultData["victory"];
 
