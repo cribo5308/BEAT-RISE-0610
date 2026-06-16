@@ -10,161 +10,248 @@ export const FUTURE_BASS_START_OFFSET = 30;
 export const FUTURE_BASS_DURATION = 60;
 export const FUTURE_BASS_BPM = 152;
 
-const BEAT = 60 / FUTURE_BASS_BPM;
-const BAR = BEAT * 4;
-
-function t(value: number) {
-  return Number(value.toFixed(3));
-}
-
-function clampTime(value: number) {
-  return Math.max(0, Math.min(FUTURE_BASS_DURATION, t(value)));
-}
-
-function makeNote(
-  time: number,
-  lane: 0 | 1 | 2 | 3,
-  type: BeatRiseNoteType
-): BeatRiseChartNote {
-  return {
-    time: clampTime(time),
-    lane,
-    type,
-  };
-}
-
-// 쉬운 기본 리듬: 킥/스네어 중심
-function addEasyGroove(
-  notes: BeatRiseChartNote[],
-  startBar: number,
-  endBar: number
-) {
-  for (let bar = startBar; bar < endBar; bar += 1) {
-    const base = bar * BAR;
-
-    // 1박, 3박만 사용
-    notes.push(makeNote(base + BEAT * 0, 1, "beat"));
-    notes.push(makeNote(base + BEAT * 2, 2, "beat"));
-
-    // 2마디마다 한 번만 장식 노트
-    if (bar % 2 === 1) {
-      notes.push(makeNote(base + BEAT * 3, 3, "melody"));
-    }
-  }
-}
-
-// 빌드업: 조금 더 리듬감 있게, 그래도 과하지 않게
-function addBuildUp(
-  notes: BeatRiseChartNote[],
-  startBar: number,
-  endBar: number
-) {
-  for (let bar = startBar; bar < endBar; bar += 1) {
-    const base = bar * BAR;
-
-    notes.push(makeNote(base + BEAT * 0, 0, "beat"));
-    notes.push(makeNote(base + BEAT * 1.5, 1, "melody"));
-    notes.push(makeNote(base + BEAT * 3, 2, "beat"));
-
-    // 마지막 2마디만 살짝 긴장감 추가
-    if (bar >= endBar - 2) {
-      notes.push(makeNote(base + BEAT * 3.5, 3, "melody"));
-    }
-  }
-}
-
-// 드롭: 리듬 타는 느낌은 살리되 한 번에 많이 안 떨어지게
-function addEasyDrop(
-  notes: BeatRiseChartNote[],
-  startBar: number,
-  endBar: number
-) {
-  const patternA = [
-    { beat: 0, lane: 1, type: "beat" },
-    { beat: 1, lane: 3, type: "beat" },
-    { beat: 2, lane: 0, type: "beat" },
-    { beat: 3, lane: 2, type: "melody" },
-  ] as const;
-
-  const patternB = [
-    { beat: 0, lane: 2, type: "beat" },
-    { beat: 1, lane: 0, type: "beat" },
-    { beat: 2, lane: 3, type: "beat" },
-    { beat: 3, lane: 1, type: "melody" },
-  ] as const;
-
-  for (let bar = startBar; bar < endBar; bar += 1) {
-    const base = bar * BAR;
-    const pattern = bar % 2 === 0 ? patternA : patternB;
-
-    pattern.forEach((item) => {
-      notes.push(
-        makeNote(
-          base + BEAT * item.beat,
-          item.lane,
-          item.type as BeatRiseNoteType
-        )
-      );
-    });
-
-    // 4마디마다 마지막에 한 개만 포인트
-    if (bar % 4 === 3) {
-      notes.push(makeNote(base + BEAT * 3.5, 3, "melody"));
-    }
-  }
-}
-
-// 쉬어가는 구간
-function addBreak(
-  notes: BeatRiseChartNote[],
-  startBar: number,
-  endBar: number
-) {
-  for (let bar = startBar; bar < endBar; bar += 1) {
-    const base = bar * BAR;
-
-    notes.push(makeNote(base + BEAT * 0, 1, "beat"));
-
-    if (bar % 2 === 0) {
-      notes.push(makeNote(base + BEAT * 2, 2, "melody"));
-    }
-  }
-}
-
-function makeFutureBassChart() {
-  const notes: BeatRiseChartNote[] = [];
-
-  // 0~8초: 쉬운 인트로
-  addEasyGroove(notes, 0, 5);
-
-  // 8~16초: 빌드업
-  addBuildUp(notes, 5, 10);
-
-  // 16~34초: 드롭, 하지만 쉬운 패턴
-  addEasyDrop(notes, 10, 22);
-
-  // 34~44초: 드롭 반복
-  addEasyDrop(notes, 22, 28);
-
-  // 44~52초: 쉬어가는 구간
-  addBreak(notes, 28, 33);
-
-  // 52~60초: 마지막 드롭
-  addEasyDrop(notes, 33, 38);
-
-  return notes
-    .filter((note) => note.time >= 0 && note.time <= FUTURE_BASS_DURATION)
-    .sort((a, b) => a.time - b.time)
-    .filter((note, index, array) => {
-      const prev = array[index - 1];
-      if (!prev) return true;
-
-      // 너무 가까운 노트 제거
-      return Math.abs(prev.time - note.time) >= 0.18;
-    });
-}
-
-export const futureBassChart: BeatRiseChartNote[] = makeFutureBassChart();
+export const futureBassChart: BeatRiseChartNote[] = [
+  { time: 2.066, lane: 3, type: "beat" },
+{ time: 2.498, lane: 3, type: "beat" },
+{ time: 2.834, lane: 3, type: "beat" },
+{ time: 3.058, lane: 2, type: "beat" },
+{ time: 3.289, lane: 1, type: "beat" },
+{ time: 3.466, lane: 0, type: "beat" },
+{ time: 3.666, lane: 3, type: "beat" },
+{ time: 4.074, lane: 3, type: "beat" },
+{ time: 4.377, lane: 3, type: "beat" },
+{ time: 4.658, lane: 2, type: "beat" },
+{ time: 4.882, lane: 1, type: "beat" },
+{ time: 5.034, lane: 0, type: "beat" },
+{ time: 5.266, lane: 3, type: "beat" },
+{ time: 5.674, lane: 1, type: "beat" },
+{ time: 6.122, lane: 2, type: "beat" },
+{ time: 6.466, lane: 1, type: "beat" },
+{ time: 6.874, lane: 2, type: "beat" },
+{ time: 7.282, lane: 3, type: "beat" },
+{ time: 7.474, lane: 0, type: "beat" },
+{ time: 7.666, lane: 2, type: "beat" },
+{ time: 7.842, lane: 1, type: "beat" },
+{ time: 8.066, lane: 3, type: "beat" },
+{ time: 8.522, lane: 3, type: "beat" },
+{ time: 8.882, lane: 1, type: "beat" },
+{ time: 9.082, lane: 3, type: "beat" },
+{ time: 9.53, lane: 2, type: "beat" },
+{ time: 9.618, lane: 0, type: "beat" },
+{ time: 9.922, lane: 1, type: "beat" },
+{ time: 10.49, lane: 3, type: "beat" },
+{ time: 10.738, lane: 0, type: "beat" },
+{ time: 10.834, lane: 2, type: "beat" },
+{ time: 11.034, lane: 1, type: "beat" },
+{ time: 11.17, lane: 3, type: "beat" },
+{ time: 11.418, lane: 0, type: "beat" },
+{ time: 11.674, lane: 3, type: "beat" },
+{ time: 12.13, lane: 3, type: "beat" },
+{ time: 12.386, lane: 2, type: "beat" },
+{ time: 12.506, lane: 1, type: "beat" },
+{ time: 12.69, lane: 3, type: "beat" },
+{ time: 12.786, lane: 0, type: "beat" },
+{ time: 13.058, lane: 3, type: "beat" },
+{ time: 13.482, lane: 3, type: "beat" },
+{ time: 13.666, lane: 1, type: "beat" },
+{ time: 13.866, lane: 2, type: "beat" },
+{ time: 14.058, lane: 0, type: "beat" },
+{ time: 14.234, lane: 3, type: "beat" },
+{ time: 14.49, lane: 2, type: "beat" },
+{ time: 14.65, lane: 1, type: "beat" },
+{ time: 14.842, lane: 0, type: "beat" },
+{ time: 15.25, lane: 3, type: "beat" },
+{ time: 15.522, lane: 2, type: "beat" },
+{ time: 15.618, lane: 1, type: "beat" },
+{ time: 15.714, lane: 0, type: "beat" },
+{ time: 15.938, lane: 3, type: "beat" },
+{ time: 16.05, lane: 2, type: "beat" },
+{ time: 16.274, lane: 1, type: "beat" },
+{ time: 16.706, lane: 3, type: "beat" },
+{ time: 16.898, lane: 2, type: "beat" },
+{ time: 17.074, lane: 1, type: "beat" },
+{ time: 17.162, lane: 0, type: "beat" },
+{ time: 17.33, lane: 3, type: "beat" },
+{ time: 17.474, lane: 2, type: "beat" },
+{ time: 17.61, lane: 1, type: "beat" },
+{ time: 17.826, lane: 0, type: "beat" },
+{ time: 18.53, lane: 3, type: "beat" },
+{ time: 18.69, lane: 2, type: "beat" },
+{ time: 18.842, lane: 1, type: "beat" },
+{ time: 19.274, lane: 0, type: "beat" },
+{ time: 20.082, lane: 1, type: "beat" },
+{ time: 20.49, lane: 2, type: "beat" },
+{ time: 20.962, lane: 3, type: "beat" },
+{ time: 21.298, lane: 3, type: "beat" },
+{ time: 21.482, lane: 1, type: "beat" },
+{ time: 21.658, lane: 2, type: "beat" },
+{ time: 21.81, lane: 0, type: "beat" },
+{ time: 22.026, lane: 3, type: "beat" },
+{ time: 22.21, lane: 1, type: "beat" },
+{ time: 22.418, lane: 2, type: "beat" },
+{ time: 22.61, lane: 0, type: "beat" },
+{ time: 22.874, lane: 3, type: "beat" },
+{ time: 23.05, lane: 1, type: "beat" },
+{ time: 23.274, lane: 2, type: "beat" },
+{ time: 23.466, lane: 0, type: "beat" },
+{ time: 23.69, lane: 3, type: "beat" },
+{ time: 23.874, lane: 1, type: "beat" },
+{ time: 24.05, lane: 2, type: "beat" },
+{ time: 24.226, lane: 0, type: "beat" },
+{ time: 24.466, lane: 3, type: "beat" },
+{ time: 24.674, lane: 1, type: "beat" },
+{ time: 24.874, lane: 2, type: "beat" },
+{ time: 25.034, lane: 0, type: "beat" },
+{ time: 25.274, lane: 3, type: "beat" },
+{ time: 25.45, lane: 1, type: "beat" },
+{ time: 25.658, lane: 2, type: "beat" },
+{ time: 25.826, lane: 0, type: "beat" },
+{ time: 26.018, lane: 3, type: "beat" },
+{ time: 26.218, lane: 1, type: "beat" },
+{ time: 26.426, lane: 2, type: "beat" },
+{ time: 26.618, lane: 0, type: "beat" },
+{ time: 26.866, lane: 3, type: "beat" },
+{ time: 27.074, lane: 2, type: "beat" },
+{ time: 27.226, lane: 1, type: "beat" },
+{ time: 27.434, lane: 0, type: "beat" },
+{ time: 27.682, lane: 3, type: "beat" },
+{ time: 27.874, lane: 1, type: "beat" },
+{ time: 28.058, lane: 2, type: "beat" },
+{ time: 28.274, lane: 1, type: "beat" },
+{ time: 28.498, lane: 3, type: "beat" },
+{ time: 28.642, lane: 1, type: "beat" },
+{ time: 28.874, lane: 2, type: "beat" },
+{ time: 29.05, lane: 1, type: "beat" },
+{ time: 29.274, lane: 3, type: "beat" },
+{ time: 29.45, lane: 1, type: "beat" },
+{ time: 29.698, lane: 2, type: "beat" },
+{ time: 29.866, lane: 1, type: "beat" },
+{ time: 30.058, lane: 3, type: "beat" },
+{ time: 30.21, lane: 1, type: "beat" },
+{ time: 30.442, lane: 2, type: "beat" },
+{ time: 30.634, lane: 1, type: "beat" },
+{ time: 30.874, lane: 3, type: "beat" },
+{ time: 31.114, lane: 2, type: "beat" },
+{ time: 31.242, lane: 1, type: "beat" },
+{ time: 31.45, lane: 0, type: "beat" },
+{ time: 31.65, lane: 3, type: "beat" },
+{ time: 31.882, lane: 2, type: "beat" },
+{ time: 32.05, lane: 1, type: "beat" },
+{ time: 32.242, lane: 0, type: "beat" },
+{ time: 32.466, lane: 3, type: "beat" },
+{ time: 33.29, lane: 2, type: "beat" },
+{ time: 33.466, lane: 1, type: "beat" },
+{ time: 33.674, lane: 0, type: "beat" },
+{ time: 33.882, lane: 3, type: "beat" },
+{ time: 34.098, lane: 2, type: "beat" },
+{ time: 34.242, lane: 1, type: "beat" },
+{ time: 34.458, lane: 0, type: "beat" },
+{ time: 34.682, lane: 0, type: "beat" },
+{ time: 34.866, lane: 0, type: "beat" },
+{ time: 35.026, lane: 1, type: "beat" },
+{ time: 35.242, lane: 2, type: "beat" },
+{ time: 35.458, lane: 3, type: "beat" },
+{ time: 35.674, lane: 3, type: "beat" },
+{ time: 35.874, lane: 3, type: "beat" },
+{ time: 36.074, lane: 2, type: "beat" },
+{ time: 36.266, lane: 1, type: "beat" },
+{ time: 36.458, lane: 0, type: "beat" },
+{ time: 36.626, lane: 0, type: "beat" },
+{ time: 36.81, lane: 0, type: "beat" },
+{ time: 37.026, lane: 1, type: "beat" },
+{ time: 37.258, lane: 2, type: "beat" },
+{ time: 37.482, lane: 3, type: "beat" },
+{ time: 37.73, lane: 1, type: "beat" },
+{ time: 38.09, lane: 2, type: "beat" },
+{ time: 38.29, lane: 1, type: "beat" },
+{ time: 38.466, lane: 2, type: "beat" },
+{ time: 38.65, lane: 1, type: "beat" },
+{ time: 39.09, lane: 3, type: "beat" },
+{ time: 39.298, lane: 0, type: "beat" },
+{ time: 39.482, lane: 2, type: "beat" },
+{ time: 39.65, lane: 1, type: "beat" },
+{ time: 39.85, lane: 3, type: "beat" },
+{ time: 40.026, lane: 0, type: "beat" },
+{ time: 40.258, lane: 2, type: "beat" },
+{ time: 40.426, lane: 1, type: "beat" },
+{ time: 40.89, lane: 3, type: "beat" },
+{ time: 41.298, lane: 0, type: "beat" },
+{ time: 41.49, lane: 1, type: "beat" },
+{ time: 41.714, lane: 2, type: "beat" },
+{ time: 41.906, lane: 3, type: "beat" },
+{ time: 42.346, lane: 1, type: "beat" },
+{ time: 42.514, lane: 2, type: "beat" },
+{ time: 42.882, lane: 0, type: "beat" },
+{ time: 43.058, lane: 1, type: "beat" },
+{ time: 43.266, lane: 2, type: "beat" },
+{ time: 43.498, lane: 3, type: "beat" },
+{ time: 43.906, lane: 2, type: "beat" },
+{ time: 44.082, lane: 1, type: "beat" },
+{ time: 44.282, lane: 0, type: "beat" },
+{ time: 44.514, lane: 3, type: "beat" },
+{ time: 44.706, lane: 2, type: "beat" },
+{ time: 44.882, lane: 1, type: "beat" },
+{ time: 45.066, lane: 0, type: "beat" },
+{ time: 45.45, lane: 0, type: "beat" },
+{ time: 45.65, lane: 1, type: "beat" },
+{ time: 45.858, lane: 2, type: "beat" },
+{ time: 46.082, lane: 3, type: "beat" },
+{ time: 46.258, lane: 0, type: "beat" },
+{ time: 46.506, lane: 3, type: "beat" },
+{ time: 46.642, lane: 0, type: "beat" },
+{ time: 46.874, lane: 2, type: "beat" },
+{ time: 47.266, lane: 1, type: "beat" },
+{ time: 47.65, lane: 3, type: "beat" },
+{ time: 47.874, lane: 2, type: "beat" },
+{ time: 48.042, lane: 1, type: "beat" },
+{ time: 48.242, lane: 0, type: "beat" },
+{ time: 48.65, lane: 0, type: "beat" },
+{ time: 48.842, lane: 1, type: "beat" },
+{ time: 49.042, lane: 2, type: "beat" },
+{ time: 49.258, lane: 3, type: "beat" },
+{ time: 49.498, lane: 0, type: "beat" },
+{ time: 49.666, lane: 3, type: "beat" },
+{ time: 49.882, lane: 0, type: "beat" },
+{ time: 50.282, lane: 2, type: "beat" },
+{ time: 50.474, lane: 1, type: "beat" },
+{ time: 50.674, lane: 2, type: "beat" },
+{ time: 50.89, lane: 1, type: "beat" },
+{ time: 51.09, lane: 3, type: "beat" },
+{ time: 51.282, lane: 0, type: "beat" },
+{ time: 51.498, lane: 3, type: "beat" },
+{ time: 51.842, lane: 1, type: "beat" },
+{ time: 52.01, lane: 2, type: "beat" },
+{ time: 52.306, lane: 1, type: "beat" },
+{ time: 52.538, lane: 3, type: "beat" },
+{ time: 52.706, lane: 0, type: "beat" },
+{ time: 52.898, lane: 2, type: "beat" },
+{ time: 53.082, lane: 1, type: "beat" },
+{ time: 53.282, lane: 3, type: "beat" },
+{ time: 53.666, lane: 3, type: "beat" },
+{ time: 53.874, lane: 2, type: "beat" },
+{ time: 54.05, lane: 1, type: "beat" },
+{ time: 54.226, lane: 0, type: "beat" },
+{ time: 54.434, lane: 3, type: "beat" },
+{ time: 54.634, lane: 2, type: "beat" },
+{ time: 55.01, lane: 1, type: "beat" },
+{ time: 55.234, lane: 0, type: "beat" },
+{ time: 55.45, lane: 3, type: "beat" },
+{ time: 55.682, lane: 2, type: "beat" },
+{ time: 55.85, lane: 1, type: "beat" },
+{ time: 56.018, lane: 0, type: "beat" },
+{ time: 56.25, lane: 3, type: "beat" },
+{ time: 56.626, lane: 0, type: "beat" },
+{ time: 56.866, lane: 2, type: "beat" },
+{ time: 57.09, lane: 1, type: "beat" },
+{ time: 57.698, lane: 3, type: "beat" },
+{ time: 58.226, lane: 2, type: "beat" },
+{ time: 58.466, lane: 1, type: "beat" },
+{ time: 58.61, lane: 0, type: "beat" },
+{ time: 58.866, lane: 3, type: "beat" },
+{ time: 59.042, lane: 0, type: "beat" },
+{ time: 59.258, lane: 3, type: "beat" },
+{ time: 59.458, lane: 0, type: "beat" },
+];
 
 export const futureBassBeatNotes = futureBassChart.filter(
   (note) => note.type === "beat"
