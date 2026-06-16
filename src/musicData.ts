@@ -73,7 +73,7 @@ export const MUSIC_TRACKS = [
     title: "Future Bass Drop",
     bpm: FUTURE_BASS_BPM,
     difficulty: "HARD" as const,
-    audioSrc: "/audio/alex-morgan-future-bass-drop-537458.mp3",
+    audioSrc: "/audio/beat.mp3",
   
     startOffset: FUTURE_BASS_START_OFFSET,
     duration: FUTURE_BASS_DURATION,
