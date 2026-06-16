@@ -1101,9 +1101,9 @@ if (!audio) {
   };
 
   audio.onloadedmetadata = startMusic;
-  audio.onerror = () => {
-    alert("음악 파일을 불러오지 못했어. audioSrc 경로를 확인해야 해.");
-  };
+audio.onerror = () => {
+  alert(`음악 파일을 불러오지 못했어.\n현재 불러온 주소: ${audio.src}`);
+};
 
   audio.load();
 }
