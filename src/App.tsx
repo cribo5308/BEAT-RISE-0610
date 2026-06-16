@@ -723,7 +723,23 @@ export default function App() {
       alert(`로그인 실패: ${error.message}`);
     }
   }
+async function signInWithKakao() {
+  const redirectUrl =
+    window.location.hostname === "localhost"
+      ? "http://localhost:5173"
+      : "https://beat-rise-0610.netlify.app";
 
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "kakao",
+    options: {
+      redirectTo: redirectUrl,
+    },
+  });
+
+  if (error) {
+    alert(`카카오 로그인 실패: ${error.message}`);
+  }
+}
   async function signOut() {
     const { error } = await supabase.auth.signOut();
 
@@ -2188,14 +2204,21 @@ export default function App() {
             </button>
             <button className="menuListButton">고객 지원</button>
             {session ? (
-              <button className="menuListButton danger" onClick={signOut}>
-                로그아웃
-              </button>
-            ) : (
-              <button className="menuListButton" onClick={signInWithGoogle}>
-                Google 로그인
-              </button>
-            )}
+            {session ? (
+  <button className="menuListButton danger" onClick={signOut}>
+    로그아웃
+  </button>
+) : (
+  <>
+    <button className="menuListButton" onClick={signInWithGoogle}>
+      Google 로그인
+    </button>
+
+    <button className="menuListButton kakaoMenuButton" onClick={signInWithKakao}>
+      카카오 로그인
+    </button>
+  </>
+)}
           </Modal>
         )}
 
