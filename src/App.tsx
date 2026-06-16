@@ -601,7 +601,10 @@ export default function App() {
       if (!payload.scores || !myOnlineSide) return;
 
       const rivalSide = myOnlineSide === "A" ? "B" : "A";
-      setRivalScore(payload.scores[rivalSide]);
+const nextRivalScore = payload.scores[rivalSide];
+
+rivalScoreRef.current = nextRivalScore;
+setRivalScore(nextRivalScore);
     }
 
     function handleScoreSync(payload: {
@@ -617,11 +620,14 @@ export default function App() {
       const rivalSide = myOnlineSide === "A" ? "B" : "A";
 
       if (payload.side === rivalSide) {
-        setRivalScore(payload.score);
-        return;
-      }
+  rivalScoreRef.current = payload.score;
+  setRivalScore(payload.score);
+  return;
+}
 
-      setRivalScore(payload.scores[rivalSide]);
+const nextRivalScore = payload.scores[rivalSide];
+rivalScoreRef.current = nextRivalScore;
+setRivalScore(nextRivalScore);
     }
 
     function handleAttackSuccess(payload: {
@@ -647,9 +653,12 @@ export default function App() {
       if (screen !== "battle") return;
 
       if (payload.scores && myOnlineSide) {
-        const rivalSide = myOnlineSide === "A" ? "B" : "A";
-        setRivalScore(payload.scores[rivalSide]);
-      }
+  const rivalSide = myOnlineSide === "A" ? "B" : "A";
+  const nextRivalScore = payload.scores[rivalSide];
+
+  rivalScoreRef.current = nextRivalScore;
+  setRivalScore(nextRivalScore);
+}
 
       if (payload.reason === "surrender" && payload.surrenderSide) {
         if (payload.surrenderSide !== myOnlineSide) {
@@ -1374,9 +1383,14 @@ audio.onerror = () => {
       onlineRoomCode
     ) {
       socket.emit("battleEnded", {
-        roomCode: onlineRoomCode,
-        reason: surrendered ? "surrender" : "timeUp",
-      });
+  roomCode: onlineRoomCode,
+  reason: surrendered ? "surrender" : "timeUp",
+  scores: {
+    myScore: myScoreRef.current,
+    rivalScore: rivalScoreRef.current,
+    side: myOnlineSide,
+  },
+});
     }
 
     setScreen("result");
